@@ -520,3 +520,84 @@
 .modal--wide {
   max-width: 640px;
 }
+
+.file-manager__search {
+  margin-bottom: 12px;
+}
+
+.file-manager__search .sh-field__input {
+  max-width: 320px;
+}
+
+.file-list--scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Más color en el panel administrativo */
+.section--admin {
+  border-top: 3px solid var(--signal);
+}
+
+.file-row {
+  transition: border-color 0.15s ease;
+}
+
+.file-row:hover {
+  border-color: var(--signal);
+}
+
+.file-row__info--dir .file-row__name {
+  color: var(--signal);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: none;
+}
+
+.status-pill--active {
+  background: var(--signal-dim);
+  color: var(--signal);
+}
+
+.status-pill--inactive {
+  background: var(--danger-dim);
+  color: #ffb4af;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  border-color: var(--signal);
+  color: var(--text);
+}
+
+.filter-pill--active {
+  background: var(--signal-dim);
+  border-color: var(--signal);
+  color: var(--signal);
+}

@@ -209,6 +209,18 @@ function iniciarServicio(
                 );
             }
 
+            if (
+                !/^[a-zA-Z0-9_.\-@]+$/.test(
+                    serviceName
+                )
+            ) {
+                return reject(
+                    new Error(
+                        "Nombre de servicio inválido"
+                    )
+                );
+            }
+
             let comando;
 
             if (
@@ -280,6 +292,18 @@ function detenerServicio(
                 );
             }
 
+            if (
+                !/^[a-zA-Z0-9_.\-@]+$/.test(
+                    serviceName
+                )
+            ) {
+                return reject(
+                    new Error(
+                        "Nombre de servicio inválido"
+                    )
+                );
+            }
+
             let comando;
 
             if (
@@ -346,6 +370,18 @@ function reiniciarServicio(
                 return reject(
                     new Error(
                         "Nombre de servicio requerido"
+                    )
+                );
+            }
+
+            if (
+                !/^[a-zA-Z0-9_.\-@]+$/.test(
+                    serviceName
+                )
+            ) {
+                return reject(
+                    new Error(
+                        "Nombre de servicio inválido"
                     )
                 );
             }

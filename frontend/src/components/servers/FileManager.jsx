@@ -1,22 +1,26 @@
 import { useEffect, useState } from "react";
 import {
   browseFiles,
+  clearStoredPath,
   createFolder,
   deleteFile,
   downloadCommandResult,
+  getStoredPath,
   moveFile,
   renameFile,
   requestDownload,
+  setStoredPath,
   uploadFile,
   waitForCommand
 } from "../../services/fileService";
 import Button from "../ui/Button";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import PromptDialog from "../ui/PromptDialog";
-import { useToast } from "../ui/Toast";
 import NewFileDialog from "../ui/NewFileDialog";
 import EditFileDialog from "../ui/EditFileDialog";
+import { useToast } from "../ui/Toast";
 
+const LIMITE_EDICION_BYTES = 2 * 1024 * 1024;
 
 function separadorDe(ruta) {
   return ruta && ruta.includes("\\") ? "\\" : "/";
@@ -69,20 +73,22 @@ function FileManager({ serverId, adminToken }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showNewFile, setShowNewFile] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [moving, setMoving] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [showNewFile, setShowNewFile] = useState(false);
   const [editingFile, setEditingFile] = useState(null);
 
   const showToast = useToast();
   const currentPath = pathStack[pathStack.length - 1];
   const token = localStorage.getItem("token");
 
+  async function cargar(path, opciones = {}) {
 
-  async function cargar(path) {
+    const { esRestauracion = false } = opciones;
 
     setLoading(true);
     setError("");
@@ -107,6 +113,14 @@ function FileManager({ serverId, adminToken }) {
     } catch (err) {
 
       console.error(err);
+
+      if (esRestauracion) {
+        clearStoredPath(serverId);
+        setPathStack([]);
+        cargar(undefined);
+        return;
+      }
+
       setError(err.message || "No se pudo listar la carpeta");
 
     } finally {
@@ -118,11 +132,29 @@ function FileManager({ serverId, adminToken }) {
   }
 
   useEffect(() => {
-    cargar(undefined);
+
+    const guardada = getStoredPath(serverId);
+
+    if (guardada && guardada.length > 0) {
+      setPathStack(guardada);
+      cargar(guardada[guardada.length - 1], { esRestauracion: true });
+    } else {
+      cargar(undefined);
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+
+    if (pathStack.length > 0) {
+      setStoredPath(serverId, pathStack);
+    }
+
+  }, [pathStack, serverId]);
+
   function entrarACarpeta(item) {
+    setSearchTerm("");
     setPathStack((pila) => [...pila, item.path]);
     cargar(item.path);
   }
@@ -130,6 +162,7 @@ function FileManager({ serverId, adminToken }) {
   function subirNivel() {
     if (pathStack.length <= 1) return;
 
+    setSearchTerm("");
     const nuevaPila = pathStack.slice(0, -1);
     setPathStack(nuevaPila);
     cargar(nuevaPila[nuevaPila.length - 1]);
@@ -167,38 +200,38 @@ function FileManager({ serverId, adminToken }) {
 
   }
 
-async function crearArchivo(nombre, contenido) {
+  async function crearArchivo(nombre, contenido) {
 
-  if (!nombre.trim()) return;
+    if (!nombre.trim()) return;
 
-  setWorking(true);
+    setWorking(true);
 
-  try {
+    try {
 
-    const nuevaRuta = unirRuta(currentPath, nombre.trim());
-    const contenidoBase64 = textoABase64(contenido || "");
-    const datos = await uploadFile(token, adminToken, serverId, nuevaRuta, contenidoBase64);
+      const nuevaRuta = unirRuta(currentPath, nombre.trim());
+      const contenidoBase64 = textoABase64(contenido || "");
+      const datos = await uploadFile(token, adminToken, serverId, nuevaRuta, contenidoBase64);
 
-    if (!datos.success) throw new Error(datos.message);
+      if (!datos.success) throw new Error(datos.message);
 
-    await waitForCommand(token, adminToken, serverId, datos.command.id);
+      await waitForCommand(token, adminToken, serverId, datos.command.id);
 
-    showToast("Archivo creado");
-    setShowNewFile(false);
-    cargar(currentPath);
+      showToast("Archivo creado");
+      setShowNewFile(false);
+      cargar(currentPath);
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error(err);
-    showToast(err.message || "No se pudo crear el archivo", "danger");
+      console.error(err);
+      showToast(err.message || "No se pudo crear el archivo", "danger");
 
-  } finally {
+    } finally {
 
-    setWorking(false);
+      setWorking(false);
+
+    }
 
   }
-
-}
 
   async function confirmarRenombrar(nuevoNombre) {
 
@@ -330,71 +363,71 @@ async function crearArchivo(nombre, contenido) {
 
   async function abrirEditor(item) {
 
-  if (item.size > 500 * 1024) {
-    showToast("El archivo es muy grande para editar acá, descargalo en su lugar", "danger");
-    return;
-  }
+    if (item.size > LIMITE_EDICION_BYTES) {
+      showToast("El archivo es muy grande para editar acá, descargalo en su lugar", "danger");
+      return;
+    }
 
-  setWorking(true);
+    setWorking(true);
 
-  try {
+    try {
 
-    const datos = await requestDownload(token, adminToken, serverId, item.path);
+      const datos = await requestDownload(token, adminToken, serverId, item.path);
 
-    if (!datos.success) throw new Error(datos.message);
+      if (!datos.success) throw new Error(datos.message);
 
-    const resultado = await waitForCommand(token, adminToken, serverId, datos.command.id);
+      const resultado = await waitForCommand(token, adminToken, serverId, datos.command.id);
 
-    setEditingFile({
-      path: item.path,
-      name: item.name,
-      content: base64ATexto(resultado.content)
-    });
+      setEditingFile({
+        path: item.path,
+        name: item.name,
+        content: base64ATexto(resultado.content)
+      });
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error(err);
-    showToast(err.message || "No se pudo abrir el archivo", "danger");
+      console.error(err);
+      showToast(err.message || "No se pudo abrir el archivo", "danger");
 
-  } finally {
+    } finally {
 
-    setWorking(false);
+      setWorking(false);
 
-  }
-
-}
-
-async function guardarEdicion(nuevoContenido) {
-
-  if (!editingFile) return;
-
-  setWorking(true);
-
-  try {
-
-    const contenidoBase64 = textoABase64(nuevoContenido);
-    const datos = await uploadFile(token, adminToken, serverId, editingFile.path, contenidoBase64);
-
-    if (!datos.success) throw new Error(datos.message);
-
-    await waitForCommand(token, adminToken, serverId, datos.command.id);
-
-    showToast("Archivo guardado");
-    setEditingFile(null);
-    cargar(currentPath);
-
-  } catch (err) {
-
-    console.error(err);
-    showToast(err.message || "No se pudo guardar el archivo", "danger");
-
-  } finally {
-
-    setWorking(false);
+    }
 
   }
 
-}
+  async function guardarEdicion(nuevoContenido) {
+
+    if (!editingFile) return;
+
+    setWorking(true);
+
+    try {
+
+      const contenidoBase64 = textoABase64(nuevoContenido);
+      const datos = await uploadFile(token, adminToken, serverId, editingFile.path, contenidoBase64);
+
+      if (!datos.success) throw new Error(datos.message);
+
+      await waitForCommand(token, adminToken, serverId, datos.command.id);
+
+      showToast("Archivo guardado");
+      setEditingFile(null);
+      cargar(currentPath);
+
+    } catch (err) {
+
+      console.error(err);
+      showToast(err.message || "No se pudo guardar el archivo", "danger");
+
+    } finally {
+
+      setWorking(false);
+
+    }
+
+  }
 
   async function subirArchivo(evento) {
 
@@ -436,8 +469,12 @@ async function guardarEdicion(nuevoContenido) {
 
   }
 
+  const itemsFiltrados = items.filter((item) =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <section className="section">
+    <section className="section section--admin">
       <div className="section__head">
         <div>
           <p className="section__eyebrow">Panel administrativo</p>
@@ -455,29 +492,40 @@ async function guardarEdicion(nuevoContenido) {
           <Button variant="ghost" className="sh-btn--sm" onClick={() => setShowNewFolder(true)} disabled={working}>
             Nueva carpeta
           </Button>
-
           <Button variant="ghost" className="sh-btn--sm" onClick={() => setShowNewFile(true)} disabled={working}>
             Nuevo archivo
-        </Button>
-            <label className={`sh-btn sh-btn--ghost sh-btn--sm${working ? " sh-btn--disabled" : ""}`}>
-                Subir archivo
-                <input type="file" hidden onChange={subirArchivo} disabled={working} />
-            </label>
+          </Button>
+          <label className={`sh-btn sh-btn--ghost sh-btn--sm${working ? " sh-btn--disabled" : ""}`}>
+            Subir archivo
+            <input type="file" hidden onChange={subirArchivo} disabled={working} />
+          </label>
         </div>
+      </div>
+
+      <div className="file-manager__search">
+        <input
+          type="text"
+          className="sh-field__input"
+          placeholder="Buscar en esta carpeta..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {error && <div className="sh-alert" role="alert">{error}</div>}
 
       {loading ? (
         <p className="modal__sub" style={{ marginBottom: 0 }}>Cargando...</p>
-      ) : items.length === 0 ? (
+      ) : itemsFiltrados.length === 0 ? (
         <div className="empty-state">
-          <strong>Carpeta vacía</strong>
-          No hay archivos ni carpetas acá.
+          <strong>{searchTerm ? "Sin resultados" : "Carpeta vacía"}</strong>
+          {searchTerm
+            ? "No encontramos archivos que coincidan con la búsqueda."
+            : "No hay archivos ni carpetas acá."}
         </div>
       ) : (
-        <div className="file-list">
-          {items.map((item) => (
+        <div className="file-list file-list--scroll">
+          {itemsFiltrados.map((item) => (
             <div className="file-row" key={item.path}>
               <div
                 className={`file-row__info${item.type === "directory" ? " file-row__info--dir" : ""}`}
@@ -493,15 +541,14 @@ async function guardarEdicion(nuevoContenido) {
 
               <div className="file-row__actions">
                 {item.type === "file" && (
-                  <Button variant="ghost" className="sh-btn--sm" onClick={() => descargar(item)} disabled={working}>
-                    Descargar
-                  </Button>
-                )}
-                {item.type === "file" && (
-                  <Button variant="ghost" className="sh-btn--sm" onClick={() => abrirEditor(item)} disabled={working}>
-                    Editar
-                  </Button>
-                  
+                  <>
+                    <Button variant="ghost" className="sh-btn--sm" onClick={() => descargar(item)} disabled={working}>
+                      Descargar
+                    </Button>
+                    <Button variant="ghost" className="sh-btn--sm" onClick={() => abrirEditor(item)} disabled={working}>
+                      Editar
+                    </Button>
+                  </>
                 )}
                 <Button variant="ghost" className="sh-btn--sm" onClick={() => setRenaming(item)} disabled={working}>
                   Renombrar
@@ -530,23 +577,23 @@ async function guardarEdicion(nuevoContenido) {
         />
       )}
 
-{showNewFile && (
-  <NewFileDialog
-    loading={working}
-    onCancel={() => setShowNewFile(false)}
-    onConfirm={crearArchivo}
-  />
-)}
+      {showNewFile && (
+        <NewFileDialog
+          loading={working}
+          onCancel={() => setShowNewFile(false)}
+          onConfirm={crearArchivo}
+        />
+      )}
 
-{editingFile && (
-  <EditFileDialog
-    fileName={editingFile.name}
-    initialContent={editingFile.content}
-    loading={working}
-    onCancel={() => setEditingFile(null)}
-    onConfirm={guardarEdicion}
-  />
-)}
+      {editingFile && (
+        <EditFileDialog
+          fileName={editingFile.name}
+          initialContent={editingFile.content}
+          loading={working}
+          onCancel={() => setEditingFile(null)}
+          onConfirm={guardarEdicion}
+        />
+      )}
 
       {renaming && (
         <PromptDialog

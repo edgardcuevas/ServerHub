@@ -1,5 +1,7 @@
 import API_URL from "../config/api";
 
+const PATH_STORAGE_PREFIX = "sh_file_path_";
+
 async function llamarFiles(token, adminToken, serverId, accion, body) {
 
   const respuesta = await fetch(
@@ -115,4 +117,25 @@ export async function downloadCommandResult(token, commandId) {
   const blob = await respuesta.blob();
 
   return { blob, fileName };
+}
+
+export function getStoredPath(serverId) {
+
+  const raw = sessionStorage.getItem(PATH_STORAGE_PREFIX + serverId);
+
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredPath(serverId, pathStack) {
+  sessionStorage.setItem(PATH_STORAGE_PREFIX + serverId, JSON.stringify(pathStack));
+}
+
+export function clearStoredPath(serverId) {
+  sessionStorage.removeItem(PATH_STORAGE_PREFIX + serverId);
 }

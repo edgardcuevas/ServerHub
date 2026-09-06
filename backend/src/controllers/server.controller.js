@@ -393,6 +393,40 @@ async function restartService(
 
 }
 
+async function listServices(req, res) {
+
+    try {
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "LIST_SERVICES",
+                {}
+            );
+
+        res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
 async function browseFiles(
     req,
     res
@@ -760,6 +794,7 @@ module.exports = {
     startService,
     stopService,
     restartService,
+    listServices,
     browseFiles,
     downloadFile,
     uploadFile,

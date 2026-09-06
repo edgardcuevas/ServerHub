@@ -11,6 +11,7 @@ import Button from "../components/ui/Button";
 import StatusDot from "../components/ui/StatusDot";
 import { useToast } from "../components/ui/Toast";
 import FileManager from "../components/servers/FileManager";
+import ServiceManager from "../components/servers/ServiceManager";
 
 function formatearRestante(ms) {
   const totalSegundos = Math.max(0, Math.floor(ms / 1000));
@@ -116,7 +117,9 @@ function ServerAdmin() {
         </div>
       </section>
 
-        <FileManager serverId={id} adminToken={session.token} />
+      <ServiceManager serverId={id} adminToken={session.token} />
+
+      <FileManager serverId={id} adminToken={session.token} />
     </AppShell>
   );
 }

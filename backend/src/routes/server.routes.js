@@ -26,6 +26,7 @@ const {
     startService,
     stopService,
     restartService,
+    listServices,
     browseFiles,
     downloadFile,
     uploadFile,
@@ -73,6 +74,13 @@ router.post(
     "/:id/verify-password",
     authenticate,
     verifyServerPassword
+);
+
+router.get(
+    "/:id/services",
+    authenticate,
+    requireAdminSession,
+    listServices
 );
 
 router.post(
