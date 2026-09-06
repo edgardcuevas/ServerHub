@@ -122,13 +122,12 @@ async function escribirArchivo(
     }
 
     if (
-        !content ||
-        typeof content !== "string"
-    ) {
-        throw new Error(
-            "Contenido requerido"
-        );
-    }
+    typeof content !== "string"
+) {
+    throw new Error(
+        "Contenido requerido"
+    );
+}
 
     const buffer =
         Buffer.from(

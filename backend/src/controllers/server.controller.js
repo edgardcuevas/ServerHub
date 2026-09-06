@@ -1,4 +1,5 @@
 const serverService = require("../services/server.service");
+const pool = require("../config/db");
 const getHealth = (req, res) => {
     res.json({
         status: "ok",
@@ -700,6 +701,50 @@ async function moveFile(
 
 }
 
+async function getCommandStatus(req, res) {
+
+    try {
+
+        const agent = await serverService.getServerAgent(
+            req.user.id,
+            req.params.id
+        );
+
+        const result = await pool.query(
+            `
+            SELECT id, command_type, status, result, created_at, executed_at
+            FROM agent_commands
+            WHERE id = $1
+            AND agent_id = $2
+            `,
+            [req.params.commandId, agent.id]
+        );
+
+        const command = result.rows[0];
+
+        if (!command) {
+            return res.status(404).json({
+                success: false,
+                message: "Comando no encontrado"
+            });
+        }
+
+        res.json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
 module.exports = {
     getHealth,
     getServerInfo,
@@ -721,5 +766,6 @@ module.exports = {
     createFolder,
     renameFile,
     deleteFile,
-    moveFile
+    moveFile,
+    getCommandStatus
 };

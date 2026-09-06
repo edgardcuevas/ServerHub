@@ -15,7 +15,6 @@ import Button from "../components/ui/Button";
 import Skeleton from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
 import AdminSessionButton from "../components/servers/AdminSessionButton";
-import AdminSessionStatus from "../components/servers/AdminSessionStatus";
 
 function ServerDetail() {
   const { id } = useParams();
@@ -30,7 +29,6 @@ function ServerDetail() {
   const [generatingKey, setGeneratingKey] = useState(false);
   const [keyError, setKeyError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [adminSession, setAdminSession] = useState(null);
   const showToast = useToast();
 
   useEffect(() => {
@@ -197,21 +195,9 @@ function copiarClave() {
               <span className="server-card__status">
                 {online ? "En línea" : "Sin conexión"}
               </span>
-              <AdminSessionButton
-                serverId={id}
-                session={adminSession}
-                onUnlock={setAdminSession}
-                onLock={() => setAdminSession(null)}
-              />
+              <AdminSessionButton serverId={id} />
             </div>
           </section>
-
-          {adminSession && (
-            <AdminSessionStatus
-              session={adminSession}
-              onExpire={() => setAdminSession(null)}
-            />
-          )}
 
           <section className="section">
             <div className="stat-grid">

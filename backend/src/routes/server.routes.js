@@ -32,7 +32,8 @@ const {
     createFolder,
     renameFile,
     deleteFile,
-    moveFile
+    moveFile,
+    getCommandStatus
 } = require("../controllers/server.controller");
 
 router.get("/health", getHealth);
@@ -141,6 +142,13 @@ router.post(
     authenticate,
     requireAdminSession,
     moveFile
+);
+
+router.get(
+    "/:id/commands/:commandId",
+    authenticate,
+    requireAdminSession,
+    getCommandStatus
 );
 
 module.exports = router;

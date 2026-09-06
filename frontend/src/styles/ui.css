@@ -214,6 +214,17 @@
   border-left-color: var(--danger);
 }
 
+
+.sh-field__textarea {
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.sh-field__textarea--lg {
+  min-height: 320px;
+}
+
 @keyframes sh-toast-in {
   from {
     opacity: 0;

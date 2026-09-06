@@ -1,15 +1,32 @@
 import { useState } from "react";
-import { createAdminSession, logoutAdminSession } from "../../services/adminSessionService";
+import { useNavigate } from "react-router-dom";
+import {
+  createAdminSession,
+  getStoredAdminSession,
+  setStoredAdminSession
+} from "../../services/adminSessionService";
 import Button from "../ui/Button";
 import ConfirmDialog from "../ui/ConfirmDialog";
-import { useToast } from "../ui/Toast";
 
-function AdminSessionButton({ serverId, session, onUnlock, onLock }) {
+function AdminSessionButton({ serverId }) {
 
   const [showUnlock, setShowUnlock] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState("");
-  const showToast = useToast();
+  const navigate = useNavigate();
+
+  function irAlPanel() {
+    navigate(`/servers/${serverId}/admin`);
+  }
+
+  function alHacerClick() {
+    if (getStoredAdminSession(serverId)) {
+      irAlPanel();
+      return;
+    }
+
+    setShowUnlock(true);
+  }
 
   async function desbloquear(password) {
 
@@ -26,9 +43,13 @@ function AdminSessionButton({ serverId, session, onUnlock, onLock }) {
         return;
       }
 
-      onUnlock({ token: datos.token, expiresAt: datos.expiresAt });
+      setStoredAdminSession(serverId, {
+        token: datos.token,
+        expiresAt: datos.expiresAt
+      });
+
       setShowUnlock(false);
-      showToast("Acceso administrativo desbloqueado");
+      irAlPanel();
 
     } catch (error) {
 
@@ -43,33 +64,10 @@ function AdminSessionButton({ serverId, session, onUnlock, onLock }) {
 
   }
 
-  async function cerrarSesion() {
-
-    try {
-
-      const token = localStorage.getItem("token");
-      await logoutAdminSession(token, serverId, session.token);
-
-    } catch (error) {
-
-      console.error(error);
-
-    } finally {
-
-      onLock();
-      showToast("Sesión administrativa cerrada");
-
-    }
-
-  }
-
   return (
     <>
-      <Button
-        variant="ghost"
-        onClick={() => (session ? cerrarSesion() : setShowUnlock(true))}
-      >
-        {session ? "Cerrar sesión administrativa" : "Panel administrativo"}
+      <Button variant="ghost" onClick={alHacerClick}>
+        Panel administrativo
       </Button>
 
       {showUnlock && (

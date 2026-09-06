@@ -7,6 +7,7 @@ import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/routing/ProtectedRoute";
 import GuestRoute from "./components/routing/GuestRoute";
 import { ToastProvider } from "./components/ui/Toast";
+import ServerAdmin from "./pages/ServerAdmin";
 
 function App() {
   return (
@@ -50,6 +51,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+  path="/servers/:id/admin"
+  element={
+    <ProtectedRoute>
+      <ServerAdmin />
+    </ProtectedRoute>
+  }
+/>
 
           <Route path="*" element={<NotFound />} />
         </Routes>

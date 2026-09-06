@@ -313,6 +313,19 @@
   margin-top: 8px;
 }
 
+.detail-head__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-left: auto;
+  padding-left: 16px;
+}
+
+.detail-head__actions .server-card__status {
+  margin-right: 4px;
+}
+
 /* Gráfico de métricas (sparkline) */
 .metrics-grid {
   display: grid;
@@ -424,4 +437,86 @@
   font-family: var(--mono);
   font-size: 13px;
   color: var(--text-dim);
+}
+
+/* Gestor de archivos */
+.file-manager__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.file-manager__path {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.file-manager__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-row {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-row__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-row__info--dir {
+  cursor: pointer;
+}
+
+.file-row__name {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row__meta {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  flex: none;
+}
+
+.file-row__actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+
+.sh-btn--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+
+.modal--wide {
+  max-width: 640px;
 }
