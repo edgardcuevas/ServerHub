@@ -4,6 +4,7 @@ import AppShell from "../components/layout/AppShell";
 import StatCard from "../components/dashboard/StatCard";
 import Skeleton from "../components/ui/Skeleton";
 import Servers from "./Servers";
+import Alerts from "../components/dashboard/Alerts";
 
 function Dashboard() {
 
@@ -90,6 +91,8 @@ useEffect(() => {
           </div>
         </section>
       )}
+
+      <Alerts />
 
       <section className="section">
         <Servers />

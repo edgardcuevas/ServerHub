@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   browseFiles,
   clearStoredPath,
@@ -85,51 +85,60 @@ function FileManager({ serverId, adminToken }) {
   const showToast = useToast();
   const currentPath = pathStack[pathStack.length - 1];
   const token = localStorage.getItem("token");
+  const requestIdRef = useRef(0);
 
   async function cargar(path, opciones = {}) {
 
-    const { esRestauracion = false } = opciones;
+  const { esRestauracion = false } = opciones;
 
-    setLoading(true);
-    setError("");
+  const idPeticion = ++requestIdRef.current;
 
-    try {
+  setLoading(true);
+  setError("");
 
-      const datos = await browseFiles(token, adminToken, serverId, path);
+  try {
 
-      if (!datos.success) {
-        throw new Error(datos.message || "No se pudo listar la carpeta");
-      }
+    const datos = await browseFiles(token, adminToken, serverId, path);
 
-      const command = datos.command;
-      const resultado = await waitForCommand(token, adminToken, serverId, command.id);
+    if (!datos.success) {
+      throw new Error(datos.message || "No se pudo listar la carpeta");
+    }
 
-      setItems(resultado.items || []);
+    const command = datos.command;
+    const resultado = await waitForCommand(token, adminToken, serverId, command.id);
 
-      if (!path) {
-        setPathStack([resultado.path]);
-      }
+    if (idPeticion !== requestIdRef.current) return;
 
-    } catch (err) {
+    setItems(resultado.items || []);
 
-      console.error(err);
+    if (!path) {
+      setPathStack([resultado.path]);
+    }
 
-      if (esRestauracion) {
-        clearStoredPath(serverId);
-        setPathStack([]);
-        cargar(undefined);
-        return;
-      }
+  } catch (err) {
 
-      setError(err.message || "No se pudo listar la carpeta");
+    if (idPeticion !== requestIdRef.current) return;
 
-    } finally {
+    console.error(err);
 
+    if (esRestauracion) {
+      clearStoredPath(serverId);
+      setPathStack([]);
+      cargar(undefined);
+      return;
+    }
+
+    setError(err.message || "No se pudo listar la carpeta");
+
+  } finally {
+
+    if (idPeticion === requestIdRef.current) {
       setLoading(false);
-
     }
 
   }
+
+}
 
   useEffect(() => {
 
