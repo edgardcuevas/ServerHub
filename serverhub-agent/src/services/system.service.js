@@ -1,4 +1,5 @@
 const os = require("os");
+const { exec } = require("child_process");
 
 function obtenerNombreSistema() {
 
@@ -42,6 +43,48 @@ function obtenerInformacionSistema(versionAgente) {
 
 }
 
+function reiniciarServidor() {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            let comando;
+
+            if (
+                process.platform === "win32"
+            ) {
+
+                comando =
+                    "shutdown /r /t 0";
+
+            } else {
+
+                comando =
+                    "reboot";
+
+            }
+
+            resolve({
+                success: true,
+                action: "REBOOT_SERVER"
+            });
+
+            setTimeout(() => {
+
+                exec(
+                    comando,
+                    () => {}
+                );
+
+            }, 1000);
+
+        }
+    );
+
+}
+
+
 module.exports = {
-    obtenerInformacionSistema
+    obtenerInformacionSistema,
+    reiniciarServidor
 };

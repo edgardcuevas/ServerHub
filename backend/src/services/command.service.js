@@ -130,8 +130,97 @@ async function completeCommand(
 
 }
 
+async function getPendingCommands(
+    agentId,
+    limit = 5
+) {
+
+    const client =
+        await pool.connect();
+
+    try {
+
+        await client.query(
+            "BEGIN"
+        );
+
+        const result =
+            await client.query(
+                `
+                SELECT *
+                FROM agent_commands
+                WHERE agent_id = $1
+                AND status = 'PENDING'
+                ORDER BY id ASC
+                LIMIT $2
+                FOR UPDATE
+                `,
+                [
+                    agentId,
+                    limit
+                ]
+            );
+
+        const commands =
+            result.rows;
+
+        if (
+            commands.length === 0
+        ) {
+
+            await client.query(
+                "COMMIT"
+            );
+
+            return [];
+
+        }
+
+        await client.query(
+            `
+            UPDATE agent_commands
+            SET status = 'IN_PROGRESS'
+            WHERE id = ANY($1)
+            `,
+            [
+                commands.map(
+                    c => c.id
+                )
+            ]
+        );
+
+        commands.forEach(
+            command => {
+                command.status =
+                    "IN_PROGRESS";
+            }
+        );
+
+        await client.query(
+            "COMMIT"
+        );
+
+        return commands;
+
+    } catch (error) {
+
+        await client.query(
+            "ROLLBACK"
+        );
+
+        throw error;
+
+    } finally {
+
+        client.release();
+
+    }
+
+}
+
 module.exports = {
     createCommand,
     getPendingCommand,
-    completeCommand
+    completeCommand,
+    getPendingCommands
 };

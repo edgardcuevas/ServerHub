@@ -1,5 +1,6 @@
 const {
-    listarProcesos
+    listarProcesos,
+    matarProceso
 } = require(
     "./process.service"
 );
@@ -25,6 +26,13 @@ const {
     "./file.service"
 );
 
+const {
+    obtenerInformacionSistema,
+    reiniciarServidor
+} = require(
+    "./system.service"
+);
+
 async function executeCommand(
     command
 ) {
@@ -45,6 +53,13 @@ async function executeCommand(
                 processes:
                     await listarProcesos()
             };
+
+        case "KILL_PROCESS":
+
+    return await matarProceso(
+        command.payload?.pid
+    );
+
 
         case "LIST_SERVICES":
 
@@ -115,6 +130,11 @@ async function executeCommand(
         command.payload?.sourcePath,
         command.payload?.destinationPath
     );
+
+        case "REBOOT_SERVER":
+
+    return await reiniciarServidor();
+
 
         default:
 

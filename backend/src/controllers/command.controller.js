@@ -129,8 +129,38 @@ async function downloadCommandFile(
     }
 
 }
+
+async function getPendingCommands(
+    req,
+    res
+) {
+
+    try {
+
+        const commands =
+            await commandService
+                .getPendingCommands(
+                    req.agent.id
+                );
+
+        res.json({
+            success: true,
+            commands
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
 module.exports = {
     getPendingCommand,
     completeCommand,
-    downloadCommandFile
+    downloadCommandFile,
+    getPendingCommands
 };

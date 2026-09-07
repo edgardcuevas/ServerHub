@@ -34,7 +34,9 @@ const {
     renameFile,
     deleteFile,
     moveFile,
-    getCommandStatus
+    getCommandStatus,
+    killProcess,
+    rebootServer
 } = require("../controllers/server.controller");
 
 router.get("/health", getHealth);
@@ -157,6 +159,20 @@ router.get(
     authenticate,
     requireAdminSession,
     getCommandStatus
+);
+
+router.post(
+    "/:id/processes/kill",
+    authenticate,
+    requireAdminSession,
+    killProcess
+);
+
+router.post(
+    "/:id/system/reboot",
+    authenticate,
+    requireAdminSession,
+    rebootServer
 );
 
 module.exports = router;

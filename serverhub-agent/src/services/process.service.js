@@ -84,6 +84,77 @@ function listarProcesos() {
 
 }
 
+function matarProceso(
+    pid
+) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            if (
+                !pid ||
+                Number.isNaN(
+                    Number(pid)
+                )
+            ) {
+
+                return reject(
+                    new Error(
+                        "PID inválido"
+                    )
+                );
+
+            }
+
+            let comando;
+
+            if (
+                process.platform === "win32"
+            ) {
+
+                comando =
+                    `taskkill /PID ${pid} /F`;
+
+            } else {
+
+                comando =
+                    `kill -9 ${pid}`;
+
+            }
+
+            exec(
+                comando,
+                (
+                    error,
+                    stdout,
+                    stderr
+                ) => {
+
+                    if (error) {
+
+                        return reject(
+                            new Error(
+                                stderr ||
+                                error.message
+                            )
+                        );
+
+                    }
+
+                    resolve({
+                        success: true,
+                        pid
+                    });
+
+                }
+            );
+
+        }
+    );
+
+}
+
 module.exports = {
-    listarProcesos
+    listarProcesos,
+    matarProceso
 };

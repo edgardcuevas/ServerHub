@@ -17,7 +17,8 @@ const {
 const {
     getPendingCommand,
     completeCommand,
-    downloadCommandFile
+    downloadCommandFile,
+    getPendingCommands
 } = require(
     "../controllers/command.controller"
 );
@@ -39,5 +40,11 @@ router.get(
     "/download/:id",
     authenticate,
     downloadCommandFile
+);
+
+router.post(
+    "/pending-batch",
+    authenticateAgent,
+    getPendingCommands
 );
 module.exports = router;

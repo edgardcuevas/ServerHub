@@ -779,6 +779,86 @@ async function getCommandStatus(req, res) {
 
 }
 
+async function killProcess(
+    req,
+    res
+) {
+
+    try {
+
+        const {
+            pid
+        } = req.body;
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "KILL_PROCESS",
+                {
+                    pid
+                }
+            );
+
+        res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
+
+async function rebootServer(
+    req,
+    res
+) {
+
+    try {
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "REBOOT_SERVER"
+            );
+
+        res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
 module.exports = {
     getHealth,
     getServerInfo,
@@ -802,5 +882,7 @@ module.exports = {
     renameFile,
     deleteFile,
     moveFile,
-    getCommandStatus
+    getCommandStatus,
+    killProcess,
+    rebootServer
 };
