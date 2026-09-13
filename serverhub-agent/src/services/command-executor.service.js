@@ -33,6 +33,12 @@ const {
     "./system.service"
 );
 
+const {
+    streamDownload
+} = require(
+    "./transfer.service"
+);
+
 async function executeCommand(
     command
 ) {
@@ -135,6 +141,12 @@ async function executeCommand(
 
     return await reiniciarServidor();
 
+        case "DOWNLOAD_STREAM":
+
+    return await streamDownload(
+        command.payload?.transferId,
+        command.payload?.filePath
+    );
 
         default:
 

@@ -4,11 +4,12 @@ import {
   clearStoredPath,
   createFolder,
   deleteFile,
-  downloadCommandResult,
+  downloadStream,
   getStoredPath,
   moveFile,
   renameFile,
   requestDownload,
+  requestStreamDownload,
   setStoredPath,
   uploadFile,
   waitForCommand
@@ -336,24 +337,22 @@ function FileManager({ serverId, adminToken }) {
 
   }
 
-  async function descargar(item) {
+    async function descargar(item) {
 
     setWorking(true);
 
     try {
 
-      const datos = await requestDownload(token, adminToken, serverId, item.path);
+      const datos = await requestStreamDownload(token, adminToken, serverId, item.path);
 
       if (!datos.success) throw new Error(datos.message);
 
-      await waitForCommand(token, adminToken, serverId, datos.command.id);
-
-      const { blob, fileName } = await downloadCommandResult(token, datos.command.id);
+            const { blob } = await downloadStream(token, adminToken, datos.transferId);
 
       const url = URL.createObjectURL(blob);
       const enlace = document.createElement("a");
       enlace.href = url;
-      enlace.download = fileName;
+      enlace.download = item.name;
       enlace.click();
       URL.revokeObjectURL(url);
 

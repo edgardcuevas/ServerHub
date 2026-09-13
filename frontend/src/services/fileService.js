@@ -48,6 +48,56 @@ export function moveFile(token, adminToken, serverId, sourcePath, destinationPat
   return llamarFiles(token, adminToken, serverId, "move", { sourcePath, destinationPath });
 }
 
+export async function requestStreamDownload(token, adminToken, serverId, path) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/transfers/${serverId}/download`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "x-admin-session": adminToken
+      },
+      body: JSON.stringify({ filePath: path })
+    }
+  );
+
+  return await respuesta.json();
+}
+
+export async function downloadStream(token, adminToken, transferId) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/transfers/download/${transferId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "x-admin-session": adminToken
+      }
+    }
+  );
+
+  if (!respuesta.ok) {
+    let mensaje = "No se pudo descargar el archivo";
+    try {
+      const datosError = await respuesta.json();
+      mensaje = datosError.message || mensaje;
+    } catch {
+      // la respuesta no vino en JSON
+    }
+    throw new Error(mensaje);
+  }
+
+  const disposition = respuesta.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="(.+)"/);
+  const fileName = match ? match[1] : "archivo";
+
+  const blob = await respuesta.blob();
+
+  return { blob, fileName };
+}
+
 export async function getCommandStatus(token, adminToken, serverId, commandId) {
 
   const respuesta = await fetch(

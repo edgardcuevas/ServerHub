@@ -21,6 +21,17 @@ const commandRoutes =
 const adminSessionRoutes =
     require("./routes/admin-session.routes");
 
+    //Download transfer routes
+const transferRoutes =
+    require(
+        "./routes/transfer.routes"
+    );
+
+const transferStreamRoutes =
+    require(
+        "./routes/transfer-stream.routes"
+    );
+
 const app = express();
 
 app.use(cors({
@@ -43,4 +54,9 @@ app.use("/api/health", healthRoutes);
 app.use( "/api/alerts", alertRoutes);
 app.use( "/api/agent/commands", commandRoutes);
 app.use("/api/server",adminSessionRoutes);
+app.use("/api/transfers", transferRoutes);
+app.use(
+    "/api/transfers/stream",
+    transferStreamRoutes
+);
 module.exports = app;
