@@ -397,8 +397,56 @@
     flex-direction: column;
     align-items: flex-start;
   }
-}
 
+  .detail-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-head__actions {
+    margin-left: 0;
+    padding-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-tab {
+    padding: 12px 14px;
+    font-size: 11.5px;
+  }
+
+  .admin-panel__content {
+    padding: 18px 16px;
+  }
+
+  .file-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .file-row__actions {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .file-manager__actions {
+    flex-wrap: wrap;
+  }
+
+    .modal {
+    padding: 20px;
+  }
+
+  .fleet-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .dashboard-panel {
+    padding: 18px 16px;
+  }
+}
 .not-found {
   min-height: 100vh;
   display: flex;
@@ -600,4 +648,183 @@
   background: var(--signal-dim);
   border-color: var(--signal);
   color: var(--signal);
+}
+
+
+/* Panel administrativo con pestañas */
+.admin-panel {
+  margin-top: 40px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.admin-panel__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.admin-tab {
+  flex: none;
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-tab:hover {
+  color: var(--text);
+}
+
+.admin-tab--active {
+  color: var(--signal);
+  border-bottom-color: var(--signal);
+}
+
+.admin-panel__content {
+  padding: 24px;
+}
+
+
+/* Animaciones del panel administrativo */
+@keyframes sh-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sh-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.admin-panel__pane {
+  animation: sh-fade-in 0.2s ease;
+}
+
+.modal {
+  animation: sh-modal-in 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-panel__pane,
+  .dashboard-panel,
+  .modal {
+    animation: none;
+  }
+}
+
+
+
+
+
+/* Dashboard: tarjeta contenedora para agrupar secciones */
+.dashboard-panel {
+  margin-top: 40px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+  animation: sh-fade-in 0.3s ease;
+}
+
+/* Dashboard: hero de estado de la flota */
+.fleet-hero {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.fleet-hero__metrics {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fleet-hero__bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fleet-hero__bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.fleet-hero__meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.fleet-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.fleet-ring__circle {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.4s ease;
+}
+
+.fleet-ring__hole {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.fleet-ring__value {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fleet-ring__label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }

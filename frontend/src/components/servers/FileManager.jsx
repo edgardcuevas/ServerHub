@@ -482,12 +482,9 @@ function FileManager({ serverId, adminToken }) {
   );
 
   return (
-    <section className="section section--admin">
+        <section className="section">
       <div className="section__head">
-        <div>
-          <p className="section__eyebrow">Panel administrativo</p>
-          <h2 className="section__title">Archivos</h2>
-        </div>
+        <h2 className="section__title">Archivos</h2>
       </div>
 
       <div className="file-manager__toolbar">

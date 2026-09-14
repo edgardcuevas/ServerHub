@@ -1,4 +1,4 @@
-function levelClass(value) {
+export function levelClass(value) {
   if (value >= 85) return "stat-card__bar-fill--danger";
   if (value >= 60) return "stat-card__bar-fill--warn";
   return "";

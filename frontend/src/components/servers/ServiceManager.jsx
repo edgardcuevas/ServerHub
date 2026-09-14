@@ -109,12 +109,9 @@ function ServiceManager({ serverId, adminToken }) {
   });
 
   return (
-    <section className="section section--admin">
+        <section className="section">
       <div className="section__head">
-        <div>
-          <p className="section__eyebrow">Panel administrativo</p>
-          <h2 className="section__title">Servicios</h2>
-        </div>
+        <h2 className="section__title">Servicios</h2>
         <Button variant="ghost" className="sh-btn--sm" onClick={cargar} disabled={loading}>
           Refrescar
         </Button>

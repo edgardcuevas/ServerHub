@@ -16,3 +16,17 @@ export async function createRegistrationKey(token, serverId) {
 
   return await respuesta.json();
 }
+
+export async function getKeys(token) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/registration-keys`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  return await respuesta.json();
+}

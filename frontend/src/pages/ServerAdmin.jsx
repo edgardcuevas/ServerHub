@@ -12,6 +12,8 @@ import StatusDot from "../components/ui/StatusDot";
 import { useToast } from "../components/ui/Toast";
 import FileManager from "../components/servers/FileManager";
 import ServiceManager from "../components/servers/ServiceManager";
+import ProcessManager from "../components/servers/ProcessManager";
+import SystemActions from "../components/servers/SystemActions";
 
 function formatearRestante(ms) {
   const totalSegundos = Math.max(0, Math.floor(ms / 1000));
@@ -19,6 +21,13 @@ function formatearRestante(ms) {
   const segundos = totalSegundos % 60;
   return `${minutos}:${segundos.toString().padStart(2, "0")}`;
 }
+
+const TABS = [
+  { id: "sistema", label: "Sistema" },
+  { id: "servicios", label: "Servicios" },
+  { id: "procesos", label: "Procesos" },
+  { id: "archivos", label: "Archivos" }
+];
 
 function ServerAdmin() {
   const { id } = useParams();
@@ -28,6 +37,7 @@ function ServerAdmin() {
   const [session] = useState(() => getStoredAdminSession(id));
   const [server, setServer] = useState(null);
   const [remaining, setRemaining] = useState(0);
+  const [activeTab, setActiveTab] = useState("sistema");
 
   useEffect(() => {
 
@@ -117,9 +127,29 @@ function ServerAdmin() {
         </div>
       </section>
 
-      <ServiceManager serverId={id} adminToken={session.token} />
+      <div className="admin-panel">
+        <div className="admin-panel__tabs">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`admin-tab${activeTab === tab.id ? " admin-tab--active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <FileManager serverId={id} adminToken={session.token} />
+                <div className="admin-panel__content">
+          <div key={activeTab} className="admin-panel__pane">
+            {activeTab === "sistema" && <SystemActions serverId={id} adminToken={session.token} />}
+            {activeTab === "servicios" && <ServiceManager serverId={id} adminToken={session.token} />}
+            {activeTab === "procesos" && <ProcessManager serverId={id} adminToken={session.token} />}
+            {activeTab === "archivos" && <FileManager serverId={id} adminToken={session.token} />}
+          </div>
+        </div>
+      </div>
     </AppShell>
   );
 }

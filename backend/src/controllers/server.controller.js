@@ -822,6 +822,43 @@ async function killProcess(
 
 }
 
+async function listProcesses(
+    req,
+    res
+) {
+
+    try {
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "LIST_PROCESSES",
+                {}
+            );
+
+        res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
 
 async function rebootServer(
     req,
@@ -884,5 +921,6 @@ module.exports = {
     moveFile,
     getCommandStatus,
     killProcess,
-    rebootServer
+    rebootServer,
+    listProcesses
 };

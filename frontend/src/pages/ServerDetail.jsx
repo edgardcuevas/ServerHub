@@ -6,7 +6,7 @@ import {
   getServerMetrics,
   getLatestMetrics
 } from "../services/serverService";
-import { createRegistrationKey } from "../services/registrationKeyService";
+import { createRegistrationKey, getKeys } from "../services/registrationKeyService";
 import AppShell from "../components/layout/AppShell";
 import StatusDot from "../components/ui/StatusDot";
 import StatCard from "../components/dashboard/StatCard";
@@ -28,7 +28,11 @@ function ServerDetail() {
   const [registrationKey, setRegistrationKey] = useState(null);
   const [generatingKey, setGeneratingKey] = useState(false);
   const [keyError, setKeyError] = useState("");
-  const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [keysHistory, setKeysHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const showToast = useToast();
 
   useEffect(() => {
@@ -130,6 +134,38 @@ function copiarClave() {
   setCopied(true);
   showToast("Clave copiada al portapapeles");
   setTimeout(() => setCopied(false), 2000);
+}
+
+async function verHistorialClaves() {
+
+  setShowHistory(true);
+  setLoadingHistory(true);
+  setHistoryError("");
+
+  try {
+
+    const token = localStorage.getItem("token");
+    const datos = await getKeys(token);
+
+    if (!datos.success) throw new Error(datos.message || "No se pudo cargar el historial");
+
+    const claves = (datos.keys || []).filter(
+      (k) => String(k.server_id) === String(id)
+    );
+
+    setKeysHistory(claves);
+
+  } catch (error) {
+
+    console.error(error);
+    setHistoryError(error.message || "No se pudo cargar el historial");
+
+  } finally {
+
+    setLoadingHistory(false);
+
+  }
+
 }
 
   const online = latest?.connectionStatus === "online";
@@ -253,9 +289,7 @@ function copiarClave() {
                 <div className="sh-alert" role="alert">
                   {keyError}
                 </div>
-              )}
-
-              {registrationKey && (
+              )}              {registrationKey && (
                 <>
                   <p className="modal__sub">
                     Usa esta clave para vincular el agente. Vence en 24 horas.
@@ -267,6 +301,65 @@ function copiarClave() {
                     </Button>
                   </div>
                 </>
+              )}
+
+              <div style={{ marginTop: "1rem" }}>
+                <Button
+                  variant="ghost"
+                  className="sh-btn--sm"
+                  onClick={verHistorialClaves}
+                  disabled={loadingHistory}
+                >
+                  {loadingHistory
+                    ? "Cargando..."
+                    : showHistory
+                    ? "Actualizar historial"
+                    : "Ver claves generadas"}
+                </Button>
+              </div>
+
+              {historyError && (
+                <div className="sh-alert" role="alert">
+                  {historyError}
+                </div>
+              )}
+
+              {showHistory && !loadingHistory && (
+                keysHistory.length === 0 ? (
+                  <div className="empty-state">
+                    <strong>Sin claves</strong>
+                    No se generaron claves para este servidor todavía.
+                  </div>
+                ) : (
+                  <div className="file-list">
+                    {keysHistory.map((clave) => {
+                      const vencida = new Date(clave.expires_at) < new Date();
+                      const estado = clave.is_used
+                        ? "Usada"
+                        : vencida
+                        ? "Vencida"
+                        : "Vigente";
+
+                      return (
+                        <div className="file-row" key={clave.id}>
+                          <div className="file-row__info">
+                            <span className="file-row__name">{clave.registration_key}</span>
+                            <span
+                              className={`status-pill${
+                                estado === "Vigente" ? " status-pill--active" : " status-pill--inactive"
+                              }`}
+                            >
+                              {estado}
+                            </span>
+                          </div>
+                          <span className="modal__sub" style={{ marginBottom: 0 }}>
+                            Vence: {new Date(clave.expires_at).toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </section>
           )}

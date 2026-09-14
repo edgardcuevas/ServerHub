@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { getDashboard } from "../services/dashboardService";
 import AppShell from "../components/layout/AppShell";
-import StatCard from "../components/dashboard/StatCard";
+import { levelClass } from "../components/dashboard/StatCard";
+import FleetRing from "../components/dashboard/FleetRing";
 import Skeleton from "../components/ui/Skeleton";
 import Servers from "./Servers";
 import Alerts from "../components/dashboard/Alerts";
@@ -51,52 +52,76 @@ useEffect(() => {
       </section>
 
       {loading && (
-        <section className="section">
-          <div className="stat-grid">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="stat-card stat-card--skeleton">
-                <Skeleton style={{ width: "60%", height: "11px" }} />
-                <Skeleton style={{ width: "40%", height: "24px" }} />
-              </div>
-            ))}
+        <div className="dashboard-panel fleet-hero">
+          <Skeleton style={{ width: "132px", height: "132px", borderRadius: "50%" }} />
+          <div className="fleet-hero__metrics">
+            <Skeleton style={{ width: "100%", height: "14px", marginBottom: "18px" }} />
+            <Skeleton style={{ width: "100%", height: "14px", marginBottom: "18px" }} />
+            <Skeleton style={{ width: "100%", height: "14px" }} />
           </div>
-        </section>
+        </div>
       )}
 
       {!loading && dashboard && (
-        <section className="section">
-          <div className="stat-grid">
-            <StatCard label="Servidores" value={dashboard.totalServers} />
-            <StatCard label="En línea" value={dashboard.onlineServers} />
-            <StatCard label="Sin conexión" value={dashboard.offlineServers} />
-            <StatCard label="Agentes" value={dashboard.totalAgents} />
-            <StatCard
-              label="CPU promedio"
-              value={dashboard.avgCpu}
-              unit="%"
-              progress={dashboard.avgCpu}
-            />
-            <StatCard
-              label="RAM promedio"
-              value={dashboard.avgRam}
-              unit="%"
-              progress={dashboard.avgRam}
-            />
-            <StatCard
-              label="Disco promedio"
-              value={dashboard.avgDisk}
-              unit="%"
-              progress={dashboard.avgDisk}
-            />
+        <div className="dashboard-panel fleet-hero">
+          <FleetRing online={dashboard.onlineServers} total={dashboard.totalServers} />
+
+          <div className="fleet-hero__metrics">
+            <div className="fleet-hero__bar">
+              <div className="fleet-hero__bar-head">
+                <span>CPU promedio</span>
+                <span>{dashboard.avgCpu}%</span>
+              </div>
+              <div className="stat-card__bar">
+                <div
+                  className={`stat-card__bar-fill ${levelClass(dashboard.avgCpu)}`.trim()}
+                  style={{ width: `${Math.min(100, Math.max(0, dashboard.avgCpu))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="fleet-hero__bar">
+              <div className="fleet-hero__bar-head">
+                <span>RAM promedio</span>
+                <span>{dashboard.avgRam}%</span>
+              </div>
+              <div className="stat-card__bar">
+                <div
+                  className={`stat-card__bar-fill ${levelClass(dashboard.avgRam)}`.trim()}
+                  style={{ width: `${Math.min(100, Math.max(0, dashboard.avgRam))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="fleet-hero__bar">
+              <div className="fleet-hero__bar-head">
+                <span>Disco promedio</span>
+                <span>{dashboard.avgDisk}%</span>
+              </div>
+              <div className="stat-card__bar">
+                <div
+                  className={`stat-card__bar-fill ${levelClass(dashboard.avgDisk)}`.trim()}
+                  style={{ width: `${Math.min(100, Math.max(0, dashboard.avgDisk))}%` }}
+                />
+              </div>
+            </div>
+
+            <p className="fleet-hero__meta">
+              {dashboard.totalServers} servidores · {dashboard.totalAgents} agentes vinculados
+            </p>
           </div>
-        </section>
+        </div>
       )}
 
-      <Alerts />
+      <div className="dashboard-panel">
+        <Alerts />
+      </div>
 
-      <section className="section">
-        <Servers />
-      </section>
+      <div className="dashboard-panel">
+        <section className="section">
+          <Servers />
+        </section>
+      </div>
     </AppShell>
   );
 }
