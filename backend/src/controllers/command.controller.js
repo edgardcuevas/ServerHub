@@ -4,6 +4,14 @@ const commandService =
 const pool =
     require("../config/db");
 
+
+const {
+    getUploadResponse,
+    removeUpload
+} = require(
+    "../services/upload-stream-registry.service"
+);
+
 async function getPendingCommand(
     req,
     res
@@ -45,17 +53,90 @@ async function completeCommand(
                 .completeCommand(
                     req.body.commandId,
                     req.body.result,
-                    req.body.status || "COMPLETED"
+                    req.body.status ||
+                        "COMPLETED"
                 );
 
-        res.json({
+        if (
+            command &&
+            command.command_type ===
+                "UPLOAD_STREAM"
+        ) {
+
+            const transferId =
+                command.payload
+                    ?.transferId;
+
+            if (transferId) {
+
+                const uploadResponse =
+                    getUploadResponse(
+                        transferId
+                    );
+
+                if (
+                    uploadResponse &&
+                    !uploadResponse.writableEnded &&
+                    !uploadResponse.destroyed
+                ) {
+
+                    removeUpload(
+                        transferId
+                    );
+
+                    if (
+                        command.status ===
+                            "COMPLETED"
+                    ) {
+
+                        uploadResponse
+                            .status(200)
+                            .json({
+                                success: true,
+                                message:
+                                    "Archivo subido correctamente",
+                                transferId,
+                                bytesWritten:
+                                    command.result
+                                        ?.bytesWritten ??
+                                    null
+                            });
+
+                    } else {
+
+                        uploadResponse
+                            .status(500)
+                            .json({
+                                success: false,
+                                message:
+                                    command.result
+                                        ?.message ||
+                                    "El agente no pudo completar la subida",
+                                transferId
+                            });
+
+                    }
+
+                } else {
+
+                    removeUpload(
+                        transferId
+                    );
+
+                }
+
+            }
+
+        }
+
+        return res.json({
             success: true,
             command
         });
 
     } catch (error) {
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: error.message
         });
@@ -63,6 +144,7 @@ async function completeCommand(
     }
 
 }
+
 
 async function downloadCommandFile(
     req,

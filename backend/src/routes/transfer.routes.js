@@ -17,13 +17,10 @@ const {
 );
 
 const {
-    createDownloadTransfer
-} = require(
-    "../controllers/transfer.controller"
-);
-
-const {
-    downloadTransfer
+    createDownloadTransfer,
+    createUploadTransfer,
+    downloadTransfer,
+    uploadTransfer
 } = require(
     "../controllers/transfer.controller"
 );
@@ -34,7 +31,9 @@ const {
     "../middlewares/transfer-admin-session.middleware"
 );
 
-
+/*
+ * DOWNLOAD
+ */
 
 router.post(
     "/:id/download",
@@ -49,4 +48,25 @@ router.get(
     requireTransferAdminSession,
     downloadTransfer
 );
+
+/*
+ * UPLOAD
+ */
+
+router.post(
+    "/:id/upload",
+    authenticate,
+    requireAdminSession,
+    createUploadTransfer
+);
+
+// Upload transfer
+
+router.put(
+    "/upload/:transferId",
+    authenticate,
+    requireTransferAdminSession,
+    uploadTransfer
+);
+
 module.exports = router;

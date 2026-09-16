@@ -34,7 +34,8 @@ const {
 );
 
 const {
-    streamDownload
+    streamDownload,
+    streamUpload
 } = require(
     "./transfer.service"
 );
@@ -144,6 +145,12 @@ async function executeCommand(
         case "DOWNLOAD_STREAM":
 
     return await streamDownload(
+        command.payload?.transferId,
+        command.payload?.filePath
+    );
+
+        case "UPLOAD_STREAM":
+    return await streamUpload(
         command.payload?.transferId,
         command.payload?.filePath
     );

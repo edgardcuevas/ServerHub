@@ -27,6 +27,14 @@ const serverService =
     );
 
 
+    const {
+    registerUpload,
+    setUploadTimeout,
+    removeUpload
+} = require(
+    "../services/upload-stream-registry.service"
+);
+
 
 
 async function createDownloadTransfer(
@@ -267,7 +275,170 @@ res.setHeader(
     }
 }
 
+async function createUploadTransfer(
+    req,
+    res
+) {
+    try {
+
+        const {
+            filePath
+        } = req.body;
+
+        const fileName =
+            filePath.includes("\\")
+                ? path.win32.basename(
+                    filePath
+                )
+                : path.posix.basename(
+                    filePath
+                );
+
+        const transfer =
+            await createTransfer(
+                req.user.id,
+                req.params.id,
+                "UPLOAD",
+                fileName,
+                filePath
+            );
+
+        res.status(201).json({
+            success: true,
+            transferId:
+                transfer.transfer_id,
+            status:
+                transfer.status
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message:
+                error.message
+        });
+
+    }
+}
+
+async function uploadTransfer(
+    req,
+    res
+) {
+    const transfer =
+        req.transfer;
+
+    let registered =
+        false;
+
+    try {
+        const wasRegistered =
+    registerUpload(
+        transfer.transfer_id,
+        req,
+        res
+    );
+
+        if (!wasRegistered) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "Esta transferencia ya está en progreso"
+            });
+        }
+
+        registered = true;
+
+        req.once(
+    "aborted",
+    () => {
+        removeUpload(
+            transfer.transfer_id
+        );
+    }
+);
+
+res.once(
+    "close",
+    () => {
+        if (!res.writableEnded) {
+            removeUpload(
+                transfer.transfer_id
+            );
+        }
+    }
+);
+
+        const uploadTimeout =
+            setTimeout(
+                () => {
+                    removeUpload(
+                        transfer.transfer_id
+                    );
+                },
+                30000
+            );
+
+        const timeoutSaved =
+            setUploadTimeout(
+                transfer.transfer_id,
+                uploadTimeout
+            );
+
+        if (!timeoutSaved) {
+            clearTimeout(
+                uploadTimeout
+            );
+
+            throw new Error(
+                "No se pudo configurar el timeout de la transferencia"
+            );
+        }
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    transfer.server_id
+                );
+
+        await createCommand(
+            agent.id,
+            "UPLOAD_STREAM",
+            {
+                transferId:
+                    transfer.transfer_id,
+
+                filePath:
+                    transfer.file_path
+            }
+        );
+    } catch (error) {
+        if (registered) {
+            removeUpload(
+                transfer.transfer_id
+            );
+        }
+
+        if (!res.headersSent) {
+            return res.status(500).json({
+                success: false,
+                message:
+                    error.message
+            });
+        }
+
+        if (!res.destroyed) {
+            res.destroy();
+        }
+    }
+}
+
 module.exports = {
     createDownloadTransfer,
-    downloadTransfer
+    downloadTransfer,
+    createUploadTransfer,
+    uploadTransfer,
+
 };

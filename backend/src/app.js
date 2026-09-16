@@ -32,6 +32,11 @@ const transferStreamRoutes =
         "./routes/transfer-stream.routes"
     );
 
+const uploadStreamRoutes =
+    require(
+        "./routes/upload-stream.routes"
+    );
+
 const app = express();
 
 app.use(cors({
@@ -55,8 +60,6 @@ app.use( "/api/alerts", alertRoutes);
 app.use( "/api/agent/commands", commandRoutes);
 app.use("/api/server",adminSessionRoutes);
 app.use("/api/transfers", transferRoutes);
-app.use(
-    "/api/transfers/stream",
-    transferStreamRoutes
-);
+app.use("/api/transfers/stream", transferStreamRoutes);
+app.use("/api/transfers/upload-stream", uploadStreamRoutes);
 module.exports = app;
