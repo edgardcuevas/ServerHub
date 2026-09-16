@@ -12,6 +12,12 @@ const {
     "../services/upload-stream-registry.service"
 );
 
+const {
+    startTransfer
+} = require(
+    "../services/file-transfer.service"
+);
+
 async function receiveUploadStream(
     req,
     res
@@ -40,14 +46,18 @@ async function receiveUploadStream(
             );
 
         if (!started) {
-            return res.status(409).json({
-                success: false,
-                message:
-                    "La transferencia ya está siendo procesada"
-            });
-        }
+    return res.status(409).json({
+        success: false,
+        message:
+            "La transferencia ya está siendo procesada"
+    });
+}
 
-        res.status(200);
+await startTransfer(
+    transferId
+);
+
+res.status(200);
 
         res.setHeader(
             "Content-Type",

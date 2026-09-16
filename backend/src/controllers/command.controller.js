@@ -12,6 +12,15 @@ const {
     "../services/upload-stream-registry.service"
 );
 
+
+const {
+    completeTransfer,
+    failTransfer,
+    updateTransferProgress
+} = require(
+    "../services/file-transfer.service"
+);
+
 async function getPendingCommand(
     req,
     res
@@ -75,18 +84,40 @@ async function completeCommand(
                     );
 
                 if (
-                    uploadResponse &&
-                    !uploadResponse.writableEnded &&
-                    !uploadResponse.destroyed
+                    command.status ===
+                        "COMPLETED"
                 ) {
+
+                    const bytesWritten =
+                        command.result
+                            ?.bytesWritten;
+
+                    if (
+                        Number.isSafeInteger(
+                            bytesWritten
+                        ) &&
+                        bytesWritten >= 0
+                    ) {
+
+                        await updateTransferProgress(
+                            transferId,
+                            bytesWritten
+                        );
+
+                    }
+
+                    await completeTransfer(
+                        transferId
+                    );
 
                     removeUpload(
                         transferId
                     );
 
                     if (
-                        command.status ===
-                            "COMPLETED"
+                        uploadResponse &&
+                        !uploadResponse.writableEnded &&
+                        !uploadResponse.destroyed
                     ) {
 
                         uploadResponse
@@ -97,31 +128,47 @@ async function completeCommand(
                                     "Archivo subido correctamente",
                                 transferId,
                                 bytesWritten:
-                                    command.result
-                                        ?.bytesWritten ??
-                                    null
-                            });
-
-                    } else {
-
-                        uploadResponse
-                            .status(500)
-                            .json({
-                                success: false,
-                                message:
-                                    command.result
-                                        ?.message ||
-                                    "El agente no pudo completar la subida",
-                                transferId
+                                    Number.isSafeInteger(
+                                        bytesWritten
+                                    )
+                                        ? bytesWritten
+                                        : null
                             });
 
                     }
 
                 } else {
 
+                    const errorMessage =
+                        command.result
+                            ?.message ||
+                        "El agente no pudo completar la subida";
+
+                    await failTransfer(
+                        transferId,
+                        errorMessage
+                    );
+
                     removeUpload(
                         transferId
                     );
+
+                    if (
+                        uploadResponse &&
+                        !uploadResponse.writableEnded &&
+                        !uploadResponse.destroyed
+                    ) {
+
+                        uploadResponse
+                            .status(500)
+                            .json({
+                                success: false,
+                                message:
+                                    errorMessage,
+                                transferId
+                            });
+
+                    }
 
                 }
 

@@ -10,8 +10,10 @@ import {
   renameFile,
   requestDownload,
   requestStreamDownload,
+  requestStreamUpload,
   setStoredPath,
   uploadFile,
+  uploadStream,
   waitForCommand
 } from "../../services/fileService";
 import Button from "../ui/Button";
@@ -437,7 +439,7 @@ function FileManager({ serverId, adminToken }) {
 
   }
 
-  async function subirArchivo(evento) {
+    async function subirArchivo(evento) {
 
     const archivo = evento.target.files?.[0];
     if (!archivo) return;
@@ -446,19 +448,12 @@ function FileManager({ serverId, adminToken }) {
 
     try {
 
-      const contenidoBase64 = await new Promise((resolve, reject) => {
-        const lector = new FileReader();
-        lector.onload = () => resolve(lector.result.split(",")[1]);
-        lector.onerror = () => reject(new Error("No se pudo leer el archivo"));
-        lector.readAsDataURL(archivo);
-      });
-
       const rutaDestino = unirRuta(currentPath, archivo.name);
-      const datos = await uploadFile(token, adminToken, serverId, rutaDestino, contenidoBase64);
+      const datos = await requestStreamUpload(token, adminToken, serverId, rutaDestino);
 
       if (!datos.success) throw new Error(datos.message);
 
-      await waitForCommand(token, adminToken, serverId, datos.command.id);
+      await uploadStream(token, adminToken, datos.transferId, archivo);
 
       showToast("Archivo subido");
       cargar(currentPath);
@@ -471,7 +466,6 @@ function FileManager({ serverId, adminToken }) {
     } finally {
 
       setWorking(false);
-      evento.target.value = "";
 
     }
 

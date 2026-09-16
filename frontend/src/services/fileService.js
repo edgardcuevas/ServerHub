@@ -189,3 +189,47 @@ export function setStoredPath(serverId, pathStack) {
 export function clearStoredPath(serverId) {
   sessionStorage.removeItem(PATH_STORAGE_PREFIX + serverId);
 }
+
+
+
+export async function requestStreamUpload(token, adminToken, serverId, path) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/transfers/${serverId}/upload`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "x-admin-session": adminToken
+      },
+      body: JSON.stringify({ filePath: path })
+    }
+  );
+
+  return await respuesta.json();
+}
+
+export async function uploadStream(token, adminToken, transferId, archivo) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/transfers/upload/${transferId}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "x-admin-session": adminToken,
+        "Content-Type": archivo.type || "application/octet-stream"
+      },
+      body: archivo
+    }
+  );
+
+  const datos = await respuesta.json();
+
+  if (!respuesta.ok || !datos.success) {
+    throw new Error(datos.message || "No se pudo subir el archivo");
+  }
+
+  return datos;
+}
