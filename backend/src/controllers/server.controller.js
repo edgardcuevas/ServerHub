@@ -470,6 +470,53 @@ async function browseFiles(
 
 }
 
+async function searchFiles(
+    req,
+    res
+) {
+
+    try {
+
+        const {
+            rootPath,
+            query,
+            limit
+        } = req.body;
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "SEARCH_FILES",
+                {
+                    rootPath,
+                    query,
+                    limit
+                }
+            );
+
+        res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+}
+
 async function downloadFile(
     req,
     res
@@ -913,6 +960,7 @@ module.exports = {
     restartService,
     listServices,
     browseFiles,
+    searchFiles,
     downloadFile,
     uploadFile,
     createFolder,

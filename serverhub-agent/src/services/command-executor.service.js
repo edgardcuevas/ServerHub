@@ -16,6 +16,7 @@ const {
 
 const {
     listarArchivos,
+    buscarArchivos,
     leerArchivo,
     escribirArchivo,
     crearCarpeta,
@@ -153,6 +154,14 @@ async function executeCommand(
     return await streamUpload(
         command.payload?.transferId,
         command.payload?.filePath
+    );
+
+        case "SEARCH_FILES":
+
+    return await buscarArchivos(
+        command.payload?.rootPath,
+        command.payload?.query,
+        command.payload?.limit
     );
 
         default:

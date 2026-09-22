@@ -60,6 +60,209 @@ async function listarArchivos(
 
 }
 
+async function buscarArchivos(
+    rootPath,
+    query,
+    limit = 100
+) {
+
+    if (
+        !rootPath ||
+        typeof rootPath !== "string"
+    ) {
+        throw new Error(
+            "Ruta de búsqueda requerida"
+        );
+    }
+
+    if (
+        !query ||
+        typeof query !== "string" ||
+        !query.trim()
+    ) {
+        throw new Error(
+            "Término de búsqueda requerido"
+        );
+    }
+
+    const parsedLimit =
+        Number(limit);
+
+    if (
+        !Number.isInteger(
+            parsedLimit
+        ) ||
+        parsedLimit < 1 ||
+        parsedLimit > 500
+    ) {
+        throw new Error(
+            "El límite debe ser un entero entre 1 y 500"
+        );
+    }
+
+    const normalizedRootPath =
+        path.resolve(
+            rootPath
+        );
+
+    const rootStats =
+        await fs.promises.stat(
+            normalizedRootPath
+        );
+
+    if (
+        !rootStats.isDirectory()
+    ) {
+        throw new Error(
+            "La ruta de búsqueda no es una carpeta"
+        );
+    }
+
+    const normalizedQuery =
+        query
+            .trim()
+            .toLowerCase();
+
+    const pendingDirectories = [
+        normalizedRootPath
+    ];
+
+    const items = [];
+
+    let truncated =
+        false;
+
+    while (
+        pendingDirectories.length > 0 &&
+        items.length < parsedLimit
+    ) {
+
+        const currentDirectory =
+            pendingDirectories.pop();
+
+        let directory;
+
+        try {
+
+            directory =
+                await fs.promises.opendir(
+                    currentDirectory
+                );
+
+        } catch {
+
+            continue;
+
+        }
+
+        try {
+
+            for await (
+                const entry of directory
+            ) {
+
+                if (
+                    entry.isSymbolicLink()
+                ) {
+                    continue;
+                }
+
+                const fullPath =
+                    path.join(
+                        currentDirectory,
+                        entry.name
+                    );
+
+                if (
+                    entry.isDirectory()
+                ) {
+                    pendingDirectories.push(
+                        fullPath
+                    );
+                }
+
+                if (
+                    !entry.name
+                        .toLowerCase()
+                        .includes(
+                            normalizedQuery
+                        )
+                ) {
+                    continue;
+                }
+
+                let size =
+                    0;
+
+                if (
+                    entry.isFile()
+                ) {
+
+                    try {
+
+                        const stats =
+                            await fs.promises.stat(
+                                fullPath
+                            );
+
+                        size =
+                            stats.size;
+
+                    } catch {
+
+                        continue;
+
+                    }
+
+                }
+
+                items.push({
+                    name:
+                        entry.name,
+                    path:
+                        fullPath,
+                    type:
+                        entry.isDirectory()
+                            ? "directory"
+                            : "file",
+                    size
+                });
+
+                if (
+                    items.length >=
+                        parsedLimit
+                ) {
+                    truncated =
+                        pendingDirectories.length > 0;
+
+                    break;
+                }
+
+            }
+
+        } catch {
+
+            continue;
+
+        }
+
+    }
+
+    return {
+        rootPath:
+            normalizedRootPath,
+        query:
+            query.trim(),
+        items,
+        count:
+            items.length,
+        limit:
+            parsedLimit,
+        truncated
+    };
+
+}
+
 async function leerArchivo(
     filePath
 ) {
@@ -299,6 +502,7 @@ async function mover(
 
 module.exports = {
     listarArchivos,
+    buscarArchivos,
     leerArchivo,
     escribirArchivo,
     crearCarpeta,

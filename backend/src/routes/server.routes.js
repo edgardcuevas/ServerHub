@@ -28,6 +28,7 @@ const {
     restartService,
     listServices,
     browseFiles,
+    searchFiles,
     downloadFile,
     uploadFile,
     createFolder,
@@ -112,6 +113,13 @@ router.post(
     authenticate,
     requireAdminSession,
     browseFiles
+);
+
+router.post(
+    "/:id/files/search",
+    authenticate,
+    requireAdminSession,
+    searchFiles
 );
 
 router.post(
