@@ -46,8 +46,7 @@ const {
 
 
 const {
-    detectarPostgreSQL,
-    detectarDocker
+    descubrirTecnologias
 } = require(
     "./technology.service"
 );
@@ -163,20 +162,15 @@ async function executeCommand(
 
     const [
         operatingSystem,
-        postgreSQL,
-        docker
+        technologies
     ] = await Promise.all([
         obtenerSistemaOperativo(),
-        detectarPostgreSQL(),
-        detectarDocker()
+        descubrirTecnologias()
     ]);
 
     return {
         operatingSystem,
-        technologies: [
-            postgreSQL,
-            docker
-        ]
+        technologies
     };
 
 }
