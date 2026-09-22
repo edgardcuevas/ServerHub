@@ -38,7 +38,10 @@ const {
     getCommandStatus,
     killProcess,
     rebootServer,
-    listProcesses
+    listProcesses,
+    getProcessDetails,
+    getProcessTree,
+    getTechnologyDiscovery
 } = require("../controllers/server.controller");
 
 router.get("/health", getHealth);
@@ -189,6 +192,28 @@ router.get(
     authenticate,
     requireAdminSession,
     listProcesses
+);
+
+router.post(
+    "/:id/processes/details",
+    authenticate,
+    requireAdminSession,
+    getProcessDetails
+);
+
+router.get(
+    "/:id/processes/tree",
+    authenticate,
+    requireAdminSession,
+    getProcessTree
+);
+
+
+router.get(
+    "/:id/technologies/discovery",
+    authenticate,
+    requireAdminSession,
+    getTechnologyDiscovery
 );
 
 module.exports = router;

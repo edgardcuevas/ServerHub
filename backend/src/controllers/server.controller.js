@@ -12,6 +12,12 @@ const {
     "../services/command.service"
 );
 
+const {
+    enrichTechnologyDiscovery
+} = require(
+    "../services/technology-catalog.service"
+);
+
 const getServerInfo = (req, res) => {
     res.json({
         nombre: "Mi VPS",
@@ -782,44 +788,77 @@ async function moveFile(
 
 }
 
-async function getCommandStatus(req, res) {
+async function getCommandStatus(
+    req,
+    res
+) {
 
     try {
 
-        const agent = await serverService.getServerAgent(
-            req.user.id,
-            req.params.id
-        );
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
 
-        const result = await pool.query(
-            `
-            SELECT id, command_type, status, result, created_at, executed_at
-            FROM agent_commands
-            WHERE id = $1
-            AND agent_id = $2
-            `,
-            [req.params.commandId, agent.id]
-        );
+        const result =
+            await pool.query(
+                `
+                SELECT
+                    id,
+                    command_type,
+                    status,
+                    result,
+                    created_at,
+                    executed_at
+                FROM agent_commands
+                WHERE id = $1
+                AND agent_id = $2
+                `,
+                [
+                    req.params.commandId,
+                    agent.id
+                ]
+            );
 
-        const command = result.rows[0];
+        const command =
+            result.rows[0];
 
         if (!command) {
             return res.status(404).json({
                 success: false,
-                message: "Comando no encontrado"
+                message:
+                    "Comando no encontrado"
             });
         }
 
-        res.json({
+        if (
+            command.command_type ===
+                "GET_TECHNOLOGY_DISCOVERY" &&
+            command.status ===
+                "COMPLETED" &&
+            command.result
+        ) {
+
+            command.result =
+                enrichTechnologyDiscovery(
+                    command.result
+                );
+
+        }
+
+        return res.json({
             success: true,
             command
         });
 
     } catch (error) {
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: error.message
+            message:
+                error.message
         });
 
     }
@@ -905,7 +944,66 @@ async function listProcesses(
     }
 
 }
+async function getProcessDetails(
+    req,
+    res
+) {
 
+    try {
+
+        const {
+            pid
+        } = req.body;
+
+        const parsedPid =
+            Number(pid);
+
+        if (
+            !Number.isInteger(
+                parsedPid
+            ) ||
+            parsedPid <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "PID inválido"
+            });
+        }
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "GET_PROCESS_DETAILS",
+                {
+                    pid:
+                        parsedPid
+                }
+            );
+
+        return res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message
+        });
+
+    }
+
+}
 
 async function rebootServer(
     req,
@@ -943,6 +1041,85 @@ async function rebootServer(
 
 }
 
+
+async function getProcessTree(
+    req,
+    res
+) {
+
+    try {
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "GET_PROCESS_TREE",
+                {}
+            );
+
+        return res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message
+        });
+
+    }
+
+}
+
+
+
+async function getTechnologyDiscovery(
+    req,
+    res
+) {
+
+    try {
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "GET_TECHNOLOGY_DISCOVERY",
+                {}
+            );
+
+        return res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message
+        });
+
+    }
+
+}
+
 module.exports = {
     getHealth,
     getServerInfo,
@@ -970,5 +1147,8 @@ module.exports = {
     getCommandStatus,
     killProcess,
     rebootServer,
-    listProcesses
+    listProcesses,
+    getProcessDetails,
+    getProcessTree,
+    getTechnologyDiscovery
 };

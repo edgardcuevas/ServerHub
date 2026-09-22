@@ -1,6 +1,8 @@
 const {
     listarProcesos,
-    matarProceso
+    obtenerDetallesProceso,
+    matarProceso,
+    obtenerArbolProcesos
 } = require(
     "./process.service"
 );
@@ -29,7 +31,8 @@ const {
 
 const {
     obtenerInformacionSistema,
-    reiniciarServidor
+    reiniciarServidor,
+    obtenerSistemaOperativo
 } = require(
     "./system.service"
 );
@@ -39,6 +42,14 @@ const {
     streamUpload
 } = require(
     "./transfer.service"
+);
+
+
+const {
+    detectarPostgreSQL,
+    detectarDocker
+} = require(
+    "./technology.service"
 );
 
 async function executeCommand(
@@ -61,6 +72,15 @@ async function executeCommand(
                 processes:
                     await listarProcesos()
             };
+
+            case "GET_PROCESS_DETAILS":
+
+    return await obtenerDetallesProceso(
+        command.payload?.pid
+    );
+            case "GET_PROCESS_TREE":
+
+    return await obtenerArbolProcesos();
 
         case "KILL_PROCESS":
 
@@ -138,6 +158,28 @@ async function executeCommand(
         command.payload?.sourcePath,
         command.payload?.destinationPath
     );
+
+        case "GET_TECHNOLOGY_DISCOVERY": {
+
+    const [
+        operatingSystem,
+        postgreSQL,
+        docker
+    ] = await Promise.all([
+        obtenerSistemaOperativo(),
+        detectarPostgreSQL(),
+        detectarDocker()
+    ]);
+
+    return {
+        operatingSystem,
+        technologies: [
+            postgreSQL,
+            docker
+        ]
+    };
+
+}
 
         case "REBOOT_SERVER":
 
