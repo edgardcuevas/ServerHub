@@ -901,249 +901,593 @@ function obtenerDetallesServicio(
 
 }
 
-function iniciarServicio(
+async function iniciarServicio(
     serviceName
 ) {
 
-    return new Promise(
-        (resolve, reject) => {
+    if (
+        typeof serviceName !==
+            "string" ||
+        !serviceName.trim()
+    ) {
+        throw new Error(
+            "Nombre de servicio requerido"
+        );
+    }
 
-            if (
-                !serviceName ||
-                typeof serviceName !== "string"
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio requerido"
-                    )
-                );
-            }
+    const normalizedServiceName =
+        serviceName.trim();
 
-            if (
-                !/^[a-zA-Z0-9_.\-@]+$/.test(
-                    serviceName
-                )
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio inválido"
-                    )
-                );
-            }
+    if (
+        normalizedServiceName.length >
+            255 ||
+        !/^[a-zA-Z0-9_.\-@]+$/.test(
+            normalizedServiceName
+        )
+    ) {
+        throw new Error(
+            "Nombre de servicio inválido"
+        );
+    }
 
-            let comando;
+    if (
+        process.platform ===
+            "win32"
+    ) {
 
-            if (
-                process.platform === "win32"
-            ) {
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
 
-                comando =
-                    `powershell -Command "Start-Service -Name '${serviceName}'"`;
+                const script = [
+                    "param($serviceName)",
+                    "Start-Service",
+                    "-Name $serviceName",
+                    "-ErrorAction Stop"
+                ].join(" ");
 
-            } else {
+                execFile(
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        script,
+                        normalizedServiceName
+                    ],
+                    {
+                        windowsHide:
+                            true,
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
 
-                comando =
-    `systemctl start ${serviceName}`;
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
 
-
-            }
-
-            exec(
-                comando,
-                {
-                    maxBuffer:
-                        10 * 1024 * 1024
-                },
-                (
-                    error,
-                    stdout,
-                    stderr
-                ) => {
-
-                    if (error) {
-
-                        return reject(
-                            new Error(
-                                stderr ||
-                                error.message
-                            )
-                        );
+                        return resolve();
 
                     }
+                );
 
-                    resolve({
-                        success: true,
-                        serviceName
-                    });
+            }
+        );
 
-                }
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
             );
 
-        }
+        return {
+            success:
+                true,
+            action:
+                "START",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    if (
+        process.platform ===
+            "linux"
+    ) {
+
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                execFile(
+                    "systemctl",
+                    [
+                        "start",
+                        normalizedServiceName
+                    ],
+                    {
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024,
+                        env: {
+                            ...process.env,
+                            LANG:
+                                "C",
+                            LC_ALL:
+                                "C"
+                        }
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (
+                            error?.code ===
+                                "ENOENT"
+                        ) {
+                            return reject(
+                                new Error(
+                                    "systemd no está disponible en este servidor"
+                                )
+                            );
+                        }
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        return resolve();
+
+                    }
+                );
+
+            }
+        );
+
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
+            );
+
+        return {
+            success:
+                true,
+            action:
+                "START",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    throw new Error(
+        `Administrador de servicios no compatible con la plataforma: ${process.platform}`
     );
 
 }
 
-function detenerServicio(
+async function detenerServicio(
     serviceName
 ) {
 
-    return new Promise(
-        (resolve, reject) => {
+    if (
+        typeof serviceName !==
+            "string" ||
+        !serviceName.trim()
+    ) {
+        throw new Error(
+            "Nombre de servicio requerido"
+        );
+    }
 
-            if (
-                !serviceName ||
-                typeof serviceName !== "string"
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio requerido"
-                    )
-                );
-            }
+    const normalizedServiceName =
+        serviceName.trim();
 
-            if (
-                !/^[a-zA-Z0-9_.\-@]+$/.test(
-                    serviceName
-                )
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio inválido"
-                    )
-                );
-            }
+    if (
+        normalizedServiceName.length >
+            255 ||
+        !/^[a-zA-Z0-9_.\-@]+$/.test(
+            normalizedServiceName
+        )
+    ) {
+        throw new Error(
+            "Nombre de servicio inválido"
+        );
+    }
 
-            let comando;
+    if (
+        process.platform ===
+            "win32"
+    ) {
 
-            if (
-                process.platform === "win32"
-            ) {
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
 
-                comando =
-                    `powershell -Command "Stop-Service -Name '${serviceName}'"`;
+                const script = [
+                    "param($serviceName)",
+                    "Stop-Service",
+                    "-Name $serviceName",
+                    "-ErrorAction Stop"
+                ].join(" ");
 
-            } else {
+                execFile(
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        script,
+                        normalizedServiceName
+                    ],
+                    {
+                        windowsHide:
+                            true,
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
 
-                comando =
-                    `systemctl stop ${serviceName}`;
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
 
-            }
-
-            exec(
-                comando,
-                {
-                    maxBuffer:
-                        10 * 1024 * 1024
-                },
-                (
-                    error,
-                    stdout,
-                    stderr
-                ) => {
-
-                    if (error) {
-
-                        return reject(
-                            new Error(
-                                stderr ||
-                                error.message
-                            )
-                        );
+                        return resolve();
 
                     }
+                );
 
-                    resolve({
-                        success: true,
-                        serviceName
-                    });
+            }
+        );
 
-                }
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
             );
 
-        }
+        return {
+            success:
+                true,
+            action:
+                "STOP",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    if (
+        process.platform ===
+            "linux"
+    ) {
+
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                execFile(
+                    "systemctl",
+                    [
+                        "stop",
+                        normalizedServiceName
+                    ],
+                    {
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024,
+                        env: {
+                            ...process.env,
+                            LANG:
+                                "C",
+                            LC_ALL:
+                                "C"
+                        }
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (
+                            error?.code ===
+                                "ENOENT"
+                        ) {
+                            return reject(
+                                new Error(
+                                    "systemd no está disponible en este servidor"
+                                )
+                            );
+                        }
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        return resolve();
+
+                    }
+                );
+
+            }
+        );
+
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
+            );
+
+        return {
+            success:
+                true,
+            action:
+                "STOP",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    throw new Error(
+        `Administrador de servicios no compatible con la plataforma: ${process.platform}`
     );
 
 }
 
-function reiniciarServicio(
+async function reiniciarServicio(
     serviceName
 ) {
 
-    return new Promise(
-        (resolve, reject) => {
+    if (
+        typeof serviceName !==
+            "string" ||
+        !serviceName.trim()
+    ) {
+        throw new Error(
+            "Nombre de servicio requerido"
+        );
+    }
 
-            if (
-                !serviceName ||
-                typeof serviceName !== "string"
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio requerido"
-                    )
-                );
-            }
+    const normalizedServiceName =
+        serviceName.trim();
 
-            if (
-                !/^[a-zA-Z0-9_.\-@]+$/.test(
-                    serviceName
-                )
-            ) {
-                return reject(
-                    new Error(
-                        "Nombre de servicio inválido"
-                    )
-                );
-            }
+    if (
+        normalizedServiceName.length >
+            255 ||
+        !/^[a-zA-Z0-9_.\-@]+$/.test(
+            normalizedServiceName
+        )
+    ) {
+        throw new Error(
+            "Nombre de servicio inválido"
+        );
+    }
 
-            let comando;
+    if (
+        process.platform ===
+            "win32"
+    ) {
 
-            if (
-                process.platform === "win32"
-            ) {
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
 
-                comando =
-                    `powershell -Command "Restart-Service -Name '${serviceName}'"`;
+                const script = [
+                    "param($serviceName)",
+                    "Restart-Service",
+                    "-Name $serviceName",
+                    "-ErrorAction Stop"
+                ].join(" ");
 
-            } else {
+                execFile(
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        script,
+                        normalizedServiceName
+                    ],
+                    {
+                        windowsHide:
+                            true,
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
 
-                comando =
-                    `systemctl restart ${serviceName}`;
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
 
-            }
-
-            exec(
-                comando,
-                {
-                    maxBuffer:
-                        10 * 1024 * 1024
-                },
-                (
-                    error,
-                    stdout,
-                    stderr
-                ) => {
-
-                    if (error) {
-
-                        return reject(
-                            new Error(
-                                stderr ||
-                                error.message
-                            )
-                        );
+                        return resolve();
 
                     }
+                );
 
-                    resolve({
-                        success: true,
-                        serviceName
-                    });
+            }
+        );
 
-                }
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
             );
 
-        }
+        return {
+            success:
+                true,
+            action:
+                "RESTART",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    if (
+        process.platform ===
+            "linux"
+    ) {
+
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                execFile(
+                    "systemctl",
+                    [
+                        "restart",
+                        normalizedServiceName
+                    ],
+                    {
+                        timeout:
+                            30000,
+                        maxBuffer:
+                            1024 * 1024,
+                        env: {
+                            ...process.env,
+                            LANG:
+                                "C",
+                            LC_ALL:
+                                "C"
+                        }
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (
+                            error?.code ===
+                                "ENOENT"
+                        ) {
+                            return reject(
+                                new Error(
+                                    "systemd no está disponible en este servidor"
+                                )
+                            );
+                        }
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    stdout?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        return resolve();
+
+                    }
+                );
+
+            }
+        );
+
+        const service =
+            await obtenerDetallesServicio(
+                normalizedServiceName
+            );
+
+        return {
+            success:
+                true,
+            action:
+                "RESTART",
+            serviceName:
+                normalizedServiceName,
+            status:
+                service.status,
+            service
+        };
+
+    }
+
+    throw new Error(
+        `Administrador de servicios no compatible con la plataforma: ${process.platform}`
     );
 
 }

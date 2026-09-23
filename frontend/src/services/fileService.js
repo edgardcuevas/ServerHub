@@ -1,4 +1,5 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
 
 const PATH_STORAGE_PREFIX = "sh_file_path_";
 
@@ -17,7 +18,7 @@ async function llamarFiles(token, adminToken, serverId, accion, body) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export function browseFiles(token, adminToken, serverId, path) {
@@ -63,7 +64,7 @@ export async function requestStreamDownload(token, adminToken, serverId, path) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function downloadStream(token, adminToken, transferId) {
@@ -110,7 +111,7 @@ export async function getCommandStatus(token, adminToken, serverId, commandId) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function waitForCommand(
@@ -207,7 +208,7 @@ export async function requestStreamUpload(token, adminToken, serverId, path) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function uploadStream(token, adminToken, transferId, archivo) {

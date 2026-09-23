@@ -1,4 +1,5 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
 
 export async function createRegistrationKey(token, serverId) {
 
@@ -14,7 +15,7 @@ export async function createRegistrationKey(token, serverId) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function getKeys(token) {
@@ -28,5 +29,5 @@ export async function getKeys(token) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }

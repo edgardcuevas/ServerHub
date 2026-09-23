@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { createAdminSession, logoutAdminSession } from "../../services/adminSessionService";
+import { createAdminSession, getStoredAdminSession, logoutAdminSession } from "../../services/adminSessionService";
 import Button from "../ui/Button";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import StatusDot from "../ui/StatusDot";
@@ -14,7 +14,7 @@ function formatearRestante(ms) {
 
 function AdminSessionPanel({ serverId, onSessionChange }) {
 
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(() => getStoredAdminSession(serverId));
   const [showUnlock, setShowUnlock] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState("");

@@ -40,13 +40,13 @@ function ConfirmDialog({
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button
+                    <Button
             type="button"
             variant="primary"
             onClick={handleConfirm}
             disabled={loading || (requirePassword && !password)}
           >
-            {loading ? "Eliminando..." : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </Button>
         </div>
       </div>

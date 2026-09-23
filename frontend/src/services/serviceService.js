@@ -1,4 +1,5 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
 
 export async function listServices(token, adminToken, serverId) {
 
@@ -12,7 +13,7 @@ export async function listServices(token, adminToken, serverId) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 async function llamarServicio(token, adminToken, serverId, accion, serviceName) {
@@ -30,7 +31,7 @@ async function llamarServicio(token, adminToken, serverId, accion, serviceName) 
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export function startService(token, adminToken, serverId, serviceName) {

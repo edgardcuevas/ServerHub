@@ -67,14 +67,11 @@ function Servers() {
         return;
       }
 
-      await deleteServer(token, deletingServer.id);
+            await deleteServer(token, deletingServer.id);
 
       setDeletingServer(null);
-      setDeletingServer(null);
 
-showToast(`Servidor "${deletingServer.name}" eliminado`);
-
-cargarServidores();
+      showToast(`Servidor "${deletingServer.name}" eliminado`);
 
       cargarServidores();
 

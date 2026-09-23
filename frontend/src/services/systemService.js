@@ -1,4 +1,5 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
 
 export async function listProcesses(token, adminToken, serverId) {
 
@@ -12,7 +13,7 @@ export async function listProcesses(token, adminToken, serverId) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function killProcess(token, adminToken, serverId, pid) {
@@ -30,7 +31,7 @@ export async function killProcess(token, adminToken, serverId, pid) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function rebootServer(token, adminToken, serverId) {
@@ -46,5 +47,5 @@ export async function rebootServer(token, adminToken, serverId) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }

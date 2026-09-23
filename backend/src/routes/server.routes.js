@@ -23,9 +23,6 @@ const {
     getLatestMetrics,
     getServerAgent,
     verifyServerPassword,
-    startService,
-    stopService,
-    restartService,
     listServices,
     browseFiles,
     searchFiles,
@@ -52,7 +49,10 @@ const {
 );
 
 const {
-    getServiceDetails
+    getServiceDetails,
+    startService,
+    stopService,
+    restartService
 } = require(
     "../controllers/service.controller"
 );

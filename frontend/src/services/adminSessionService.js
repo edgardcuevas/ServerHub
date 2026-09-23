@@ -1,4 +1,6 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
+
 
 const STORAGE_PREFIX = "sh_admin_session_";
 
@@ -16,7 +18,7 @@ export async function createAdminSession(token, serverId, password) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function logoutAdminSession(token, serverId, sessionToken) {
@@ -33,7 +35,7 @@ export async function logoutAdminSession(token, serverId, sessionToken) {
     }
   );
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export function getStoredAdminSession(serverId) {

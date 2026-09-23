@@ -58,8 +58,12 @@ function Alerts() {
 
   }
 
-  useEffect(() => {
+    useEffect(() => {
     cargar(showResolved);
+
+    const intervalo = setInterval(() => cargar(showResolved), 20000);
+
+    return () => clearInterval(intervalo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showResolved]);
 

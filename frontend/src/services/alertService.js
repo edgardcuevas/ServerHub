@@ -1,4 +1,6 @@
 import API_URL from "../config/api";
+import { handleResponse } from "./apiClient";
+
 
 export async function getActiveAlerts(token) {
 
@@ -6,7 +8,7 @@ export async function getActiveAlerts(token) {
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
 
 export async function getAlerts(token) {
@@ -15,5 +17,5 @@ export async function getAlerts(token) {
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  return await respuesta.json();
+  return await handleResponse(respuesta);
 }
