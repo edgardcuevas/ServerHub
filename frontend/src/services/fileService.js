@@ -49,6 +49,10 @@ export function moveFile(token, adminToken, serverId, sourcePath, destinationPat
   return llamarFiles(token, adminToken, serverId, "move", { sourcePath, destinationPath });
 }
 
+export function searchFiles(token, adminToken, serverId, rootPath, query, limit = 100) {
+  return llamarFiles(token, adminToken, serverId, "search", { rootPath, query, limit });
+}
+
 export async function requestStreamDownload(token, adminToken, serverId, path) {
 
   const respuesta = await fetch(

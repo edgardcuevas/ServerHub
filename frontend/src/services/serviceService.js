@@ -16,6 +16,24 @@ export async function listServices(token, adminToken, serverId) {
   return await handleResponse(respuesta);
 }
 
+export async function getServiceDetails(token, adminToken, serverId, serviceName) {
+
+  const respuesta = await fetch(
+    `${API_URL}/api/server/${serverId}/services/details`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "x-admin-session": adminToken
+      },
+      body: JSON.stringify({ serviceName })
+    }
+  );
+
+  return await handleResponse(respuesta);
+}
+
 async function llamarServicio(token, adminToken, serverId, accion, serviceName) {
 
   const respuesta = await fetch(

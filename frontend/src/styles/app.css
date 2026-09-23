@@ -571,6 +571,10 @@
 
 .file-manager__search {
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .file-manager__search .sh-field__input {
@@ -621,6 +625,130 @@
   background: var(--danger-dim);
   color: #ffb4af;
 }
+
+/* Encabezado de tecnología detectada (modales de detalle) */
+.tech-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.tech-header__icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--void);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--signal);
+}
+
+.tech-header__title {
+  font-size: 18px;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.tech-header__desc {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* Grilla de especificaciones (modales de detalle) */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.spec-item {
+  background: var(--void);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.spec-item--wide {
+  grid-column: 1 / -1;
+}
+
+.spec-item__label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.spec-item__value {
+  font-size: 13.5px;
+  word-break: break-word;
+}
+
+.spec-item__value--mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+/* Árbol de subprocesos (modal de detalle de proceso) */
+.process-tree {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 20px;
+}
+
+.process-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.process-tree__toggle {
+  flex: none;
+  width: 16px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+
+.process-tree__toggle--empty {
+  cursor: default;
+}
+
+.process-tree__name {
+  flex: 1;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.process-tree__pid,
+.process-tree__cpu {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.process-tree__children {
+  margin-left: 20px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
 
 .filter-pills {
   display: flex;

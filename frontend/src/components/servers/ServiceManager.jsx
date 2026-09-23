@@ -3,6 +3,7 @@ import { waitForCommand } from "../../services/fileService";
 import { listServices, restartService, startService, stopService } from "../../services/serviceService";
 import Button from "../ui/Button";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import ServiceDetailsModal from "./ServiceDetailsModal";
 import StatusDot from "../ui/StatusDot";
 import { useToast } from "../ui/Toast";
 
@@ -23,6 +24,7 @@ function ServiceManager({ serverId, adminToken }) {
   const [confirmingStop, setConfirmingStop] = useState(null);
   const [confirmingRestart, setConfirmingRestart] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [detalleServicio, setDetalleServicio] = useState(null);
 
   const showToast = useToast();
   const token = localStorage.getItem("token");
@@ -177,6 +179,14 @@ function ServiceManager({ serverId, adminToken }) {
                 </div>
 
                 <div className="file-row__actions">
+                  <Button
+                    variant="ghost"
+                    className="sh-btn--sm"
+                    onClick={() => setDetalleServicio(service)}
+                    disabled={!!working}
+                  >
+                    Detalles
+                  </Button>
                   {activo ? (
                     <Button
                       variant="ghost"
@@ -222,7 +232,7 @@ function ServiceManager({ serverId, adminToken }) {
         />
       )}
 
-      {confirmingRestart && (
+            {confirmingRestart && (
         <ConfirmDialog
           title="Reiniciar servicio"
           message={`¿Seguro que querés reiniciar "${confirmingRestart.name}"?`}
@@ -230,6 +240,16 @@ function ServiceManager({ serverId, adminToken }) {
           loading={working === confirmingRestart.name}
           onCancel={() => setConfirmingRestart(null)}
           onConfirm={() => ejecutarAccion(confirmingRestart.name, "restart")}
+        />
+      )}
+
+      {detalleServicio && (
+        <ServiceDetailsModal
+          serverId={serverId}
+          adminToken={adminToken}
+          service={detalleServicio}
+          onClose={() => setDetalleServicio(null)}
+          onCambio={cargar}
         />
       )}
     </section>

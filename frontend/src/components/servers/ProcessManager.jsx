@@ -3,6 +3,7 @@ import { waitForCommand } from "../../services/fileService";
 import { listProcesses, killProcess } from "../../services/systemService";
 import Button from "../ui/Button";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import ProcessDetailsModal from "./ProcessDetailsModal";
 import { useToast } from "../ui/Toast";
 
 function ProcessManager({ serverId, adminToken }) {
@@ -14,6 +15,7 @@ function ProcessManager({ serverId, adminToken }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [working, setWorking] = useState(null);
   const [confirmingKill, setConfirmingKill] = useState(null);
+  const [detalleProceso, setDetalleProceso] = useState(null);
 
   const showToast = useToast();
   const token = localStorage.getItem("token");
@@ -128,7 +130,15 @@ function ProcessManager({ serverId, adminToken }) {
                 <span className="modal__sub" style={{ marginBottom: 0 }}>PID {proceso.pid}</span>
               </div>
 
-              <div className="file-row__actions">
+                            <div className="file-row__actions">
+                <Button
+                  variant="ghost"
+                  className="sh-btn--sm"
+                  onClick={() => setDetalleProceso(proceso)}
+                  disabled={!!working}
+                >
+                  Detalles
+                </Button>
                 <Button
                   variant="ghost"
                   className="sh-btn--sm"
@@ -143,7 +153,7 @@ function ProcessManager({ serverId, adminToken }) {
         </div>
       )}
 
-      {confirmingKill && (
+            {confirmingKill && (
         <ConfirmDialog
           title="Terminar proceso"
           message={`¿Seguro que querés terminar "${confirmingKill.name}" (PID ${confirmingKill.pid})? Podés perder trabajo sin guardar en ese programa.`}
@@ -151,6 +161,19 @@ function ProcessManager({ serverId, adminToken }) {
           loading={working === confirmingKill.pid}
           onCancel={() => setConfirmingKill(null)}
           onConfirm={() => matarProceso(confirmingKill.pid)}
+        />
+      )}
+
+      {detalleProceso && (
+        <ProcessDetailsModal
+          serverId={serverId}
+          adminToken={adminToken}
+          proceso={detalleProceso}
+          onClose={() => setDetalleProceso(null)}
+          onCambio={() => {
+            setDetalleProceso(null);
+            cargar();
+          }}
         />
       )}
     </section>

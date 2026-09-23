@@ -11,6 +11,7 @@ import {
   requestDownload,
   requestStreamDownload,
   requestStreamUpload,
+  searchFiles,
   setStoredPath,
   uploadFile,
   uploadStream,
@@ -77,6 +78,8 @@ function FileManager({ serverId, adminToken }) {
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [busquedaServidor, setBusquedaServidor] = useState(null);
+  const [buscando, setBuscando] = useState(false);
 
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNewFile, setShowNewFile] = useState(false);
@@ -165,8 +168,9 @@ function FileManager({ serverId, adminToken }) {
 
   }, [pathStack, serverId]);
 
-  function entrarACarpeta(item) {
+    function entrarACarpeta(item) {
     setSearchTerm("");
+    setBusquedaServidor(null);
     setPathStack((pila) => [...pila, item.path]);
     cargar(item.path);
   }
@@ -471,9 +475,46 @@ function FileManager({ serverId, adminToken }) {
 
   }
 
-  const itemsFiltrados = items.filter((item) =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  async function buscarEnServidor() {
+
+    if (!searchTerm.trim()) return;
+
+    setBuscando(true);
+    setError("");
+
+    try {
+
+      const datos = await searchFiles(token, adminToken, serverId, currentPath, searchTerm.trim(), 100);
+
+      if (!datos.success) throw new Error(datos.message || "No se pudo buscar en el servidor");
+
+      const resultado = await waitForCommand(token, adminToken, serverId, datos.command.id);
+
+      setBusquedaServidor(resultado);
+
+    } catch (err) {
+
+      console.error(err);
+      showToast(err.message || "No se pudo buscar en el servidor", "danger");
+
+    } finally {
+
+      setBuscando(false);
+
+    }
+
+  }
+
+  function salirDeBusqueda() {
+    setBusquedaServidor(null);
+    setSearchTerm("");
+  }
+
+  const enBusqueda = !!busquedaServidor;
+
+  const itemsFiltrados = enBusqueda
+    ? busquedaServidor.items
+    : items.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
         <section className="section">
@@ -501,7 +542,7 @@ function FileManager({ serverId, adminToken }) {
         </div>
       </div>
 
-      <div className="file-manager__search">
+            <div className="file-manager__search">
         <input
           type="text"
           className="sh-field__input"
@@ -509,16 +550,38 @@ function FileManager({ serverId, adminToken }) {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        <Button
+          variant="ghost"
+          className="sh-btn--sm"
+          onClick={buscarEnServidor}
+          disabled={!searchTerm.trim() || buscando}
+        >
+          {buscando ? "Buscando..." : "Buscar en todo el servidor"}
+        </Button>
+        {enBusqueda && (
+          <Button variant="ghost" className="sh-btn--sm" onClick={salirDeBusqueda}>
+            Volver a la carpeta
+          </Button>
+        )}
       </div>
 
-      {error && <div className="sh-alert" role="alert">{error}</div>}
+            {error && <div className="sh-alert" role="alert">{error}</div>}
 
-      {loading ? (
-        <p className="modal__sub" style={{ marginBottom: 0 }}>Cargando...</p>
+      {enBusqueda && !buscando && (
+        <p className="modal__sub">
+          {busquedaServidor.items.length} resultado{busquedaServidor.items.length === 1 ? "" : "s"} para "{busquedaServidor.query}" en {busquedaServidor.rootPath}
+          {busquedaServidor.truncated ? " — hay más resultados, afiná la búsqueda" : ""}
+        </p>
+      )}
+
+      {loading || buscando ? (
+        <p className="modal__sub" style={{ marginBottom: 0 }}>{buscando ? "Buscando en el servidor..." : "Cargando..."}</p>
       ) : itemsFiltrados.length === 0 ? (
         <div className="empty-state">
-          <strong>{searchTerm ? "Sin resultados" : "Carpeta vacía"}</strong>
-          {searchTerm
+          <strong>{enBusqueda || searchTerm ? "Sin resultados" : "Carpeta vacía"}</strong>
+          {enBusqueda
+            ? "No encontramos archivos ni carpetas que coincidan en el servidor."
+            : searchTerm
             ? "No encontramos archivos que coincidan con la búsqueda."
             : "No hay archivos ni carpetas acá."}
         </div>
@@ -531,7 +594,7 @@ function FileManager({ serverId, adminToken }) {
                 onClick={() => item.type === "directory" && entrarACarpeta(item)}
               >
                 <span className="file-row__name">
-                  {item.type === "directory" ? "📁" : "📄"} {item.name}
+                  {item.type === "directory" ? "📁" : "📄"} {enBusqueda ? item.path : item.name}
                 </span>
                 {item.type === "file" && (
                   <span className="file-row__meta">{formatearTamaño(item.size)}</span>

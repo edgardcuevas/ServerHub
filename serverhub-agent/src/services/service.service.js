@@ -16,7 +16,7 @@ function listarServicios() {
             ) {
 
                 comando =
-                    'powershell -Command "Get-Service | Select-Object Name,Status | ConvertTo-Json -Compress"';
+                    'powershell -Command "Get-Service | Select-Object Name, @{Name=\'Status\';Expression={$_.Status.ToString()}} | ConvertTo-Json -Compress"';
 
                 exec(
                     comando,
