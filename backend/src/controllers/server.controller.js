@@ -865,146 +865,6 @@ async function getCommandStatus(
 
 }
 
-async function killProcess(
-    req,
-    res
-) {
-
-    try {
-
-        const {
-            pid
-        } = req.body;
-
-        const agent =
-            await serverService
-                .getServerAgent(
-                    req.user.id,
-                    req.params.id
-                );
-
-        const command =
-            await createCommand(
-                agent.id,
-                "KILL_PROCESS",
-                {
-                    pid
-                }
-            );
-
-        res.status(201).json({
-            success: true,
-            command
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-
-    }
-
-}
-
-async function listProcesses(
-    req,
-    res
-) {
-
-    try {
-
-        const agent =
-            await serverService
-                .getServerAgent(
-                    req.user.id,
-                    req.params.id
-                );
-
-        const command =
-            await createCommand(
-                agent.id,
-                "LIST_PROCESSES",
-                {}
-            );
-
-        res.status(201).json({
-            success: true,
-            command
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-
-    }
-
-}
-async function getProcessDetails(
-    req,
-    res
-) {
-
-    try {
-
-        const {
-            pid
-        } = req.body;
-
-        const parsedPid =
-            Number(pid);
-
-        if (
-            !Number.isInteger(
-                parsedPid
-            ) ||
-            parsedPid <= 0
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "PID inválido"
-            });
-        }
-
-        const agent =
-            await serverService
-                .getServerAgent(
-                    req.user.id,
-                    req.params.id
-                );
-
-        const command =
-            await createCommand(
-                agent.id,
-                "GET_PROCESS_DETAILS",
-                {
-                    pid:
-                        parsedPid
-                }
-            );
-
-        return res.status(201).json({
-            success: true,
-            command
-        });
-
-    } catch (error) {
-
-        return res.status(500).json({
-            success: false,
-            message:
-                error.message
-        });
-
-    }
-
-}
-
 async function rebootServer(
     req,
     res
@@ -1040,46 +900,6 @@ async function rebootServer(
     }
 
 }
-
-
-async function getProcessTree(
-    req,
-    res
-) {
-
-    try {
-
-        const agent =
-            await serverService
-                .getServerAgent(
-                    req.user.id,
-                    req.params.id
-                );
-
-        const command =
-            await createCommand(
-                agent.id,
-                "GET_PROCESS_TREE",
-                {}
-            );
-
-        return res.status(201).json({
-            success: true,
-            command
-        });
-
-    } catch (error) {
-
-        return res.status(500).json({
-            success: false,
-            message:
-                error.message
-        });
-
-    }
-
-}
-
 
 
 async function getTechnologyDiscovery(
@@ -1119,7 +939,6 @@ async function getTechnologyDiscovery(
     }
 
 }
-
 module.exports = {
     getHealth,
     getServerInfo,
@@ -1145,10 +964,6 @@ module.exports = {
     deleteFile,
     moveFile,
     getCommandStatus,
-    killProcess,
     rebootServer,
-    listProcesses,
-    getProcessDetails,
-    getProcessTree,
     getTechnologyDiscovery
 };

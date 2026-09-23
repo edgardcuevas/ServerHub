@@ -2,6 +2,7 @@ const {
     listarProcesos,
     obtenerDetallesProceso,
     matarProceso,
+    iniciarProceso,
     obtenerArbolProcesos
 } = require(
     "./process.service"
@@ -86,6 +87,18 @@ async function executeCommand(
     return await matarProceso(
         command.payload?.pid
     );
+
+        case "START_PROCESS":
+
+    return await iniciarProceso({
+        executable:
+            command.payload?.executable,
+        args:
+            command.payload?.args,
+        workingDirectory:
+            command.payload
+                ?.workingDirectory
+    });
 
 
         case "LIST_SERVICES":

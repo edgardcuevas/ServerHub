@@ -1,7 +1,18 @@
-const { exec } = require("child_process");
+const {
+    exec,
+    spawn
+} = require(
+    "child_process"
+);
+
+const fs =
+    require("fs/promises");
+
+const path =
+    require("path");
+
 const si =
     require("systeminformation");
-
 function listarProcesos() {
 
     return new Promise(
@@ -239,6 +250,261 @@ function matarProceso(
 
 }
 
+
+async function iniciarProceso(
+    options
+) {
+
+    if (
+        !options ||
+        typeof options !== "object" ||
+        Array.isArray(options)
+    ) {
+        throw new Error(
+            "Configuración del proceso requerida"
+        );
+    }
+
+    const {
+        executable,
+        args = [],
+        workingDirectory
+    } = options;
+
+    if (
+        typeof executable !== "string" ||
+        !executable.trim()
+    ) {
+        throw new Error(
+            "Ejecutable requerido"
+        );
+    }
+
+    const normalizedExecutable =
+        executable.trim();
+
+    if (
+        normalizedExecutable.length >
+            100
+    ) {
+        throw new Error(
+            "Nombre de ejecutable demasiado largo"
+        );
+    }
+
+    if (
+        !/^[a-zA-Z0-9._-]+$/.test(
+            normalizedExecutable
+        )
+    ) {
+        throw new Error(
+            "Nombre de ejecutable inválido"
+        );
+    }
+
+    if (
+        normalizedExecutable.includes(
+            "/"
+        ) ||
+        normalizedExecutable.includes(
+            "\\"
+        )
+    ) {
+        throw new Error(
+            "No se permiten rutas en el nombre del ejecutable"
+        );
+    }
+
+    if (
+        !Array.isArray(args)
+    ) {
+        throw new Error(
+            "Los argumentos deben ser un arreglo"
+        );
+    }
+
+    if (
+        args.length > 50
+    ) {
+        throw new Error(
+            "Demasiados argumentos"
+        );
+    }
+
+    const normalizedArgs =
+        args.map(
+            (
+                argument,
+                index
+            ) => {
+
+                if (
+                    typeof argument !==
+                        "string"
+                ) {
+                    throw new Error(
+                        `Argumento inválido en la posición ${index}`
+                    );
+                }
+
+                if (
+                    argument.length >
+                        1000
+                ) {
+                    throw new Error(
+                        `Argumento demasiado largo en la posición ${index}`
+                    );
+                }
+
+                if (
+                    /[\0\r\n]/.test(
+                        argument
+                    )
+                ) {
+                    throw new Error(
+                        `Argumento inválido en la posición ${index}`
+                    );
+                }
+
+                return argument;
+
+            }
+        );
+
+    if (
+        typeof workingDirectory !==
+            "string" ||
+        !workingDirectory.trim()
+    ) {
+        throw new Error(
+            "Directorio de trabajo requerido"
+        );
+    }
+
+    const normalizedWorkingDirectory =
+        path.resolve(
+            workingDirectory.trim()
+        );
+
+    if (
+        !path.isAbsolute(
+            normalizedWorkingDirectory
+        )
+    ) {
+        throw new Error(
+            "El directorio de trabajo debe ser absoluto"
+        );
+    }
+
+    let directoryStats;
+
+    try {
+
+        directoryStats =
+            await fs.stat(
+                normalizedWorkingDirectory
+            );
+
+    } catch (error) {
+
+        throw new Error(
+            "El directorio de trabajo no existe"
+        );
+
+    }
+
+    if (
+        !directoryStats.isDirectory()
+    ) {
+        throw new Error(
+            "La ruta de trabajo no es un directorio"
+        );
+    }
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            let settled =
+                false;
+
+            const childProcess =
+                spawn(
+                    normalizedExecutable,
+                    normalizedArgs,
+                    {
+                        cwd:
+                            normalizedWorkingDirectory,
+                        detached:
+                            true,
+                        shell:
+                            false,
+                        windowsHide:
+                            true,
+                        stdio:
+                            "ignore"
+                    }
+                );
+
+            childProcess.once(
+                "error",
+                error => {
+
+                    if (settled) {
+                        return;
+                    }
+
+                    settled =
+                        true;
+
+                    reject(
+                        new Error(
+                            `No se pudo iniciar el proceso: ${error.message}`
+                        )
+                    );
+
+                }
+            );
+
+            childProcess.once(
+                "spawn",
+                () => {
+
+                    if (settled) {
+                        return;
+                    }
+
+                    settled =
+                        true;
+
+                    childProcess.unref();
+
+                    resolve({
+                        success:
+                            true,
+                        pid:
+                            childProcess.pid,
+                        executable:
+                            normalizedExecutable,
+                        args:
+                            normalizedArgs,
+                        workingDirectory:
+                            normalizedWorkingDirectory,
+                        detached:
+                            true
+                    });
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
 async function obtenerArbolProcesos() {
 
     const processData =
@@ -384,5 +650,6 @@ module.exports = {
     listarProcesos,
     obtenerDetallesProceso,
     matarProceso,
+    iniciarProceso,
     obtenerArbolProcesos
 };

@@ -36,13 +36,19 @@ const {
     deleteFile,
     moveFile,
     getCommandStatus,
-    killProcess,
     rebootServer,
-    listProcesses,
-    getProcessDetails,
-    getProcessTree,
     getTechnologyDiscovery
 } = require("../controllers/server.controller");
+
+const {
+    listProcesses,
+    startProcess,
+    killProcess,
+    getProcessDetails,
+    getProcessTree
+} = require(
+    "../controllers/process.controller"
+);
 
 router.get("/health", getHealth);
 
@@ -178,6 +184,13 @@ router.post(
     authenticate,
     requireAdminSession,
     killProcess
+);
+
+router.post(
+    "/:id/processes/start",
+    authenticate,
+    requireAdminSession,
+    startProcess
 );
 
 router.post(
