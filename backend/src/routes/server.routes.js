@@ -51,6 +51,12 @@ const {
     "../controllers/process.controller"
 );
 
+const {
+    getServiceDetails
+} = require(
+    "../controllers/service.controller"
+);
+
 router.get("/health", getHealth);
 
 router.get("/info", getServerInfo);
@@ -95,6 +101,13 @@ router.get(
     authenticate,
     requireAdminSession,
     listServices
+);
+
+router.post(
+    "/:id/services/details",
+    authenticate,
+    requireAdminSession,
+    getServiceDetails
 );
 
 router.post(

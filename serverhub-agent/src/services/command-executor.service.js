@@ -13,7 +13,8 @@ const {
     listarServicios,
     iniciarServicio,
     detenerServicio,
-    reiniciarServicio
+    reiniciarServicio,
+    obtenerDetallesServicio
 } = require(
     "./service.service"
 );
@@ -80,13 +81,19 @@ async function executeCommand(
         command.payload?.pid
     );
 
+            case "GET_SERVICE_DETAILS":
+
+    return await obtenerDetallesServicio(
+        command.payload?.serviceName
+    );
+
         case "CLASSIFY_PROCESS":
 
     return await clasificarProceso(
         command.payload?.pid
     );
 
-    
+
             case "GET_PROCESS_TREE":
 
     return await obtenerArbolProcesos();

@@ -500,6 +500,407 @@ function obtenerServicioPorPid(
 
 }
 
+function obtenerDetallesServicio(
+    serviceName
+) {
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            if (
+                typeof serviceName !==
+                    "string" ||
+                !serviceName.trim()
+            ) {
+                return reject(
+                    new Error(
+                        "Nombre de servicio requerido"
+                    )
+                );
+            }
+
+            const normalizedServiceName =
+                serviceName.trim();
+
+            if (
+                normalizedServiceName.length >
+                    255 ||
+                !/^[a-zA-Z0-9_.\-@]+$/.test(
+                    normalizedServiceName
+                )
+            ) {
+                return reject(
+                    new Error(
+                        "Nombre de servicio inválido"
+                    )
+                );
+            }
+
+            if (
+                process.platform ===
+                    "win32"
+            ) {
+
+                const script = [
+                    "$service = Get-CimInstance",
+                    "-ClassName Win32_Service",
+                    `-Filter "Name = '${normalizedServiceName}'"`,
+                    ";",
+                    "if ($null -eq $service) {",
+                    "exit 3",
+                    "}",
+                    ";",
+                    "$service |",
+                    "Select-Object",
+                    "Name,",
+                    "DisplayName,",
+                    "State,",
+                    "StartMode,",
+                    "ProcessId,",
+                    "PathName,",
+                    "Description,",
+                    "ServiceType,",
+                    "StartName",
+                    "| ConvertTo-Json",
+                    "-Compress"
+                ].join(" ");
+
+                execFile(
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        script
+                    ],
+                    {
+                        windowsHide:
+                            true,
+                        timeout:
+                            15000,
+                        maxBuffer:
+                            1024 * 1024
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (
+                            error &&
+                            error.code === 3
+                        ) {
+                            return reject(
+                                new Error(
+                                    "Servicio no encontrado"
+                                )
+                            );
+                        }
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        const output =
+                            stdout.trim();
+
+                        if (!output) {
+                            return reject(
+                                new Error(
+                                    "Servicio no encontrado"
+                                )
+                            );
+                        }
+
+                        try {
+
+                            const service =
+                                JSON.parse(
+                                    output
+                                );
+
+                            return resolve({
+                                name:
+                                    service.Name ||
+                                    normalizedServiceName,
+                                displayName:
+                                    service.DisplayName ||
+                                    null,
+                                description:
+                                    service.Description ||
+                                    null,
+                                status:
+                                    service.State
+                                        ? String(
+                                            service.State
+                                        ).toUpperCase()
+                                        : null,
+                                subStatus:
+                                    null,
+                                startMode:
+                                    service.StartMode
+                                        ? String(
+                                            service.StartMode
+                                        ).toUpperCase()
+                                        : null,
+                                enabled:
+                                    service.StartMode
+                                        ? ![
+                                            "DISABLED"
+                                        ].includes(
+                                            String(
+                                                service.StartMode
+                                            ).toUpperCase()
+                                        )
+                                        : null,
+                                pid:
+                                    Number(
+                                        service.ProcessId
+                                    ) || null,
+                                executablePath:
+                                    service.PathName ||
+                                    null,
+                                account:
+                                    service.StartName ||
+                                    null,
+                                serviceType:
+                                    service.ServiceType ||
+                                    null,
+                                manager:
+                                    "windows-service"
+                            });
+
+                        } catch (
+                            parseError
+                        ) {
+
+                            return reject(
+                                new Error(
+                                    "No se pudo interpretar la información del servicio"
+                                )
+                            );
+
+                        }
+
+                    }
+                );
+
+                return;
+
+            }
+
+            if (
+                process.platform ===
+                    "linux"
+            ) {
+
+                execFile(
+                    "systemctl",
+                    [
+                        "show",
+                        normalizedServiceName,
+                        "--property=Id",
+                        "--property=Description",
+                        "--property=LoadState",
+                        "--property=ActiveState",
+                        "--property=SubState",
+                        "--property=UnitFileState",
+                        "--property=MainPID",
+                        "--property=ExecMainStartTimestamp",
+                        "--property=FragmentPath",
+                        "--no-pager"
+                    ],
+                    {
+                        timeout:
+                            15000,
+                        maxBuffer:
+                            1024 * 1024,
+                        env: {
+                            ...process.env,
+                            LANG:
+                                "C",
+                            LC_ALL:
+                                "C"
+                        }
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (
+                            error?.code ===
+                                "ENOENT"
+                        ) {
+                            return reject(
+                                new Error(
+                                    "systemd no está disponible en este servidor"
+                                )
+                            );
+                        }
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        const properties =
+                            {};
+
+                        for (
+                            const line of
+                            stdout.split(
+                                /\r?\n/
+                            )
+                        ) {
+
+                            const separatorIndex =
+                                line.indexOf(
+                                    "="
+                                );
+
+                            if (
+                                separatorIndex <= 0
+                            ) {
+                                continue;
+                            }
+
+                            const key =
+                                line
+                                    .slice(
+                                        0,
+                                        separatorIndex
+                                    )
+                                    .trim();
+
+                            const value =
+                                line
+                                    .slice(
+                                        separatorIndex + 1
+                                    )
+                                    .trim();
+
+                            properties[key] =
+                                value;
+
+                        }
+
+                        if (
+                            !properties.Id ||
+                            properties.LoadState ===
+                                "not-found"
+                        ) {
+                            return reject(
+                                new Error(
+                                    "Servicio no encontrado"
+                                )
+                            );
+                        }
+
+                        const unitFileState =
+                            properties.UnitFileState
+                                ? String(
+                                    properties.UnitFileState
+                                ).toUpperCase()
+                                : null;
+
+                        const enabledStates = [
+                            "ENABLED",
+                            "ENABLED-RUNTIME",
+                            "STATIC",
+                            "INDIRECT",
+                            "ALIAS",
+                            "GENERATED"
+                        ];
+
+                        return resolve({
+                            name:
+                                properties.Id,
+                            displayName:
+                                properties.Description ||
+                                null,
+                            description:
+                                properties.Description ||
+                                null,
+                            status:
+                                properties.ActiveState
+                                    ? String(
+                                        properties.ActiveState
+                                    ).toUpperCase()
+                                    : null,
+                            subStatus:
+                                properties.SubState
+                                    ? String(
+                                        properties.SubState
+                                    ).toUpperCase()
+                                    : null,
+                            loadState:
+                                properties.LoadState
+                                    ? String(
+                                        properties.LoadState
+                                    ).toUpperCase()
+                                    : null,
+                            startMode:
+                                unitFileState,
+                            enabled:
+                                unitFileState
+                                    ? enabledStates.includes(
+                                        unitFileState
+                                    )
+                                    : null,
+                            pid:
+                                Number(
+                                    properties.MainPID
+                                ) || null,
+                            executablePath:
+                                null,
+                            account:
+                                null,
+                            serviceType:
+                                "systemd-unit",
+                            started:
+                                properties
+                                    .ExecMainStartTimestamp ||
+                                null,
+                            unitFile:
+                                properties.FragmentPath ||
+                                null,
+                            manager:
+                                "systemd"
+                        });
+
+                    }
+                );
+
+                return;
+
+            }
+
+            return reject(
+                new Error(
+                    `Administrador de servicios no compatible con la plataforma: ${process.platform}`
+                )
+            );
+
+        }
+    );
+
+}
+
 function iniciarServicio(
     serviceName
 ) {
@@ -750,6 +1151,7 @@ module.exports = {
     listarServicios,
     obtenerServicioPorPid,
     iniciarServicio,
+    obtenerDetallesServicio,
     detenerServicio,
     reiniciarServicio
 };
