@@ -1,5 +1,9 @@
-const { exec } = require("child_process");
-
+const {
+    exec,
+    execFile
+} = require(
+    "child_process"
+);
 function listarServicios() {
 
     return new Promise(
@@ -181,6 +185,311 @@ function listarServicios() {
 
                     resolve(
                         services
+                    );
+
+                }
+            );
+
+        }
+    );
+
+}
+
+function obtenerServicioPorPid(
+    pid
+) {
+
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            const parsedPid =
+                Number(pid);
+
+            if (
+                !Number.isInteger(
+                    parsedPid
+                ) ||
+                parsedPid <= 0
+            ) {
+                return reject(
+                    new Error(
+                        "PID inválido"
+                    )
+                );
+            }
+
+            if (
+                process.platform ===
+                    "win32"
+            ) {
+
+                const script = [
+                    "$service = Get-CimInstance",
+                    "-ClassName Win32_Service",
+                    `-Filter "ProcessId = ${parsedPid}"`,
+                    "| Select-Object",
+                    "-First 1",
+                    "Name,State,ProcessId",
+                    "| ConvertTo-Json",
+                    "-Compress"
+                ].join(" ");
+
+                execFile(
+                    "powershell.exe",
+                    [
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-Command",
+                        script
+                    ],
+                    {
+                        windowsHide:
+                            true,
+                        timeout:
+                            15000,
+                        maxBuffer:
+                            1024 * 1024
+                    },
+                    (
+                        error,
+                        stdout,
+                        stderr
+                    ) => {
+
+                        if (error) {
+                            return reject(
+                                new Error(
+                                    stderr?.trim() ||
+                                    error.message
+                                )
+                            );
+                        }
+
+                        const output =
+                            stdout.trim();
+
+                        if (!output) {
+                            return resolve(
+                                null
+                            );
+                        }
+
+                        try {
+
+                            const service =
+                                JSON.parse(
+                                    output
+                                );
+
+                            if (
+                                !service ||
+                                !service.Name
+                            ) {
+                                return resolve(
+                                    null
+                                );
+                            }
+
+                            return resolve({
+                                name:
+                                    service.Name,
+                                status:
+                                    service.State
+                                        ? String(
+                                            service.State
+                                        ).toUpperCase()
+                                        : null,
+                                pid:
+                                    Number(
+                                        service.ProcessId
+                                    ) || null,
+                                manager:
+                                    "windows-service"
+                            });
+
+                        } catch (
+                            parseError
+                        ) {
+
+                            return reject(
+                                new Error(
+                                    "No se pudo interpretar la información del servicio"
+                                )
+                            );
+
+                        }
+
+                    }
+                );
+
+                return;
+
+            }
+
+            execFile(
+                "systemctl",
+                [
+                    "status",
+                    String(parsedPid),
+                    "--no-pager",
+                    "--full"
+                ],
+                {
+                    timeout:
+                        15000,
+                    maxBuffer:
+                        1024 * 1024,
+                    env: {
+                        ...process.env,
+                        LANG:
+                            "C",
+                        LC_ALL:
+                            "C"
+                    }
+                },
+                (
+                    error,
+                    stdout,
+                    stderr
+                ) => {
+
+                    const output =
+                        [
+                            stdout,
+                            stderr
+                        ]
+                            .filter(Boolean)
+                            .join("\n")
+                            .trim();
+
+                    if (!output) {
+                        return resolve(
+                            null
+                        );
+                    }
+
+                    const unitMatch =
+                        output.match(
+                            /^[\s●○×]*([^\s]+\.service)\b/m
+                        );
+
+                    if (!unitMatch) {
+                        return resolve(
+                            null
+                        );
+                    }
+
+                    const serviceName =
+                        unitMatch[1];
+
+                    execFile(
+                        "systemctl",
+                        [
+                            "show",
+                            serviceName,
+                            "--property=Id",
+                            "--property=ActiveState",
+                            "--property=SubState",
+                            "--property=MainPID",
+                            "--no-pager"
+                        ],
+                        {
+                            timeout:
+                                15000,
+                            maxBuffer:
+                                1024 * 1024,
+                            env: {
+                                ...process.env,
+                                LANG:
+                                    "C",
+                                LC_ALL:
+                                    "C"
+                            }
+                        },
+                        (
+                            showError,
+                            showStdout,
+                            showStderr
+                        ) => {
+
+                            if (showError) {
+                                return reject(
+                                    new Error(
+                                        showStderr?.trim() ||
+                                        showError.message
+                                    )
+                                );
+                            }
+
+                            const properties =
+                                {};
+
+                            for (
+                                const line of
+                                showStdout.split(
+                                    /\r?\n/
+                                )
+                            ) {
+
+                                const separatorIndex =
+                                    line.indexOf(
+                                        "="
+                                    );
+
+                                if (
+                                    separatorIndex <= 0
+                                ) {
+                                    continue;
+                                }
+
+                                const key =
+                                    line
+                                        .slice(
+                                            0,
+                                            separatorIndex
+                                        )
+                                        .trim();
+
+                                const value =
+                                    line
+                                        .slice(
+                                            separatorIndex + 1
+                                        )
+                                        .trim();
+
+                                properties[key] =
+                                    value;
+
+                            }
+
+                            return resolve({
+                                name:
+                                    properties.Id ||
+                                    serviceName,
+                                status:
+                                    properties.ActiveState
+                                        ? String(
+                                            properties.ActiveState
+                                        ).toUpperCase()
+                                        : null,
+                                subStatus:
+                                    properties.SubState
+                                        ? String(
+                                            properties.SubState
+                                        ).toUpperCase()
+                                        : null,
+                                pid:
+                                    Number(
+                                        properties.MainPID
+                                    ) || null,
+                                manager:
+                                    "systemd"
+                            });
+
+                        }
                     );
 
                 }
@@ -439,6 +748,7 @@ function reiniciarServicio(
 }
 module.exports = {
     listarServicios,
+    obtenerServicioPorPid,
     iniciarServicio,
     detenerServicio,
     reiniciarServicio

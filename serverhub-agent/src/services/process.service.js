@@ -13,6 +13,14 @@ const path =
 
 const si =
     require("systeminformation");
+
+
+    const {
+    obtenerServicioPorPid
+} = require(
+    "./service.service"
+);
+
 function listarProcesos() {
 
     return new Promise(
@@ -176,6 +184,83 @@ async function obtenerDetallesProceso(
             null,
         running:
             true
+    };
+
+}
+
+async function clasificarProceso(
+    pid
+) {
+
+    const processInfo =
+        await obtenerDetallesProceso(
+            pid
+        );
+
+    let serviceInfo =
+        null;
+
+    try {
+
+        serviceInfo =
+            await obtenerServicioPorPid(
+                processInfo.pid
+            );
+
+    } catch (error) {
+
+        serviceInfo =
+            null;
+
+    }
+
+    if (serviceInfo) {
+
+        return {
+            process:
+                processInfo,
+            source:
+                "SERVICE",
+            restartable:
+                true,
+            restartMethod:
+                "SERVICE",
+            service:
+                serviceInfo
+        };
+
+    }
+
+    const hasExecutable =
+        typeof processInfo.path ===
+            "string" &&
+        Boolean(
+            processInfo.path.trim()
+        );
+
+    const hasCommand =
+        typeof processInfo.command ===
+            "string" &&
+        Boolean(
+            processInfo.command.trim()
+        );
+
+    const restartable =
+        hasExecutable &&
+        hasCommand;
+
+    return {
+        process:
+            processInfo,
+        source:
+            "EXTERNAL",
+        restartable,
+        restartMethod:
+            restartable
+                ? "PROCESS"
+                : "UNSUPPORTED",
+        service:
+            null
     };
 
 }
@@ -649,6 +734,7 @@ async function obtenerArbolProcesos() {
 module.exports = {
     listarProcesos,
     obtenerDetallesProceso,
+    clasificarProceso,
     matarProceso,
     iniciarProceso,
     obtenerArbolProcesos

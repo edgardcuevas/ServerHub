@@ -332,10 +332,72 @@ async function startProcess(
 
 }
 
+async function classifyProcess(
+    req,
+    res
+) {
+
+    try {
+
+        const {
+            pid
+        } = req.body;
+
+        const parsedPid =
+            Number(pid);
+
+        if (
+            !Number.isInteger(
+                parsedPid
+            ) ||
+            parsedPid <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "PID inválido"
+            });
+        }
+
+        const agent =
+            await serverService
+                .getServerAgent(
+                    req.user.id,
+                    req.params.id
+                );
+
+        const command =
+            await createCommand(
+                agent.id,
+                "CLASSIFY_PROCESS",
+                {
+                    pid:
+                        parsedPid
+                }
+            );
+
+        return res.status(201).json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+
+        return res.status(500).json({
+            success: false,
+            message:
+                error.message
+        });
+
+    }
+
+}
+
 module.exports = {
     listProcesses,
     startProcess,
     killProcess,
     getProcessDetails,
-    getProcessTree
+    getProcessTree,
+    classifyProcess
 };

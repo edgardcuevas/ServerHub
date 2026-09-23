@@ -1,6 +1,7 @@
 const {
     listarProcesos,
     obtenerDetallesProceso,
+    clasificarProceso,
     matarProceso,
     iniciarProceso,
     obtenerArbolProcesos
@@ -78,6 +79,14 @@ async function executeCommand(
     return await obtenerDetallesProceso(
         command.payload?.pid
     );
+
+        case "CLASSIFY_PROCESS":
+
+    return await clasificarProceso(
+        command.payload?.pid
+    );
+
+    
             case "GET_PROCESS_TREE":
 
     return await obtenerArbolProcesos();

@@ -45,7 +45,8 @@ const {
     startProcess,
     killProcess,
     getProcessDetails,
-    getProcessTree
+    getProcessTree,
+    classifyProcess
 } = require(
     "../controllers/process.controller"
 );
@@ -227,6 +228,14 @@ router.get(
     authenticate,
     requireAdminSession,
     getTechnologyDiscovery
+);
+
+
+router.post(
+    "/:id/processes/classify",
+    authenticate,
+    requireAdminSession,
+    classifyProcess
 );
 
 module.exports = router;
