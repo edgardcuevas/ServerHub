@@ -8,6 +8,7 @@ import {
   getStoredPath,
   moveFile,
   renameFile,
+  downloadCommandResult,
   requestDownload,
   requestStreamDownload,
   requestStreamUpload,
@@ -375,6 +376,30 @@ function FileManager({ serverId, adminToken }) {
 
   }
 
+    async function descargarCopiaEdicion() {
+
+    if (!editingFile) return;
+
+    try {
+
+      const { blob, fileName } = await downloadCommandResult(token, editingFile.commandId);
+
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = fileName || editingFile.name;
+      enlace.click();
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+
+      console.error(err);
+      showToast(err.message || "No se pudo descargar el archivo", "danger");
+
+    }
+
+  }
+
   async function abrirEditor(item) {
 
     if (item.size > LIMITE_EDICION_BYTES) {
@@ -392,10 +417,11 @@ function FileManager({ serverId, adminToken }) {
 
       const resultado = await waitForCommand(token, adminToken, serverId, datos.command.id);
 
-      setEditingFile({
+        setEditingFile({
         path: item.path,
         name: item.name,
-        content: base64ATexto(resultado.content)
+        content: base64ATexto(resultado.content),
+        commandId: datos.command.id
       });
 
     } catch (err) {
@@ -647,13 +673,14 @@ function FileManager({ serverId, adminToken }) {
         />
       )}
 
-      {editingFile && (
+            {editingFile && (
         <EditFileDialog
           fileName={editingFile.name}
           initialContent={editingFile.content}
           loading={working}
           onCancel={() => setEditingFile(null)}
           onConfirm={guardarEdicion}
+          onDownload={descargarCopiaEdicion}
         />
       )}
 

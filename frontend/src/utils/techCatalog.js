@@ -37,6 +37,23 @@ const CATALOGO = [
   }
 ];
 
+const CATEGORIA_POR_ID = {
+  postgresql: "database",
+  mysql: "database",
+  docker: "container",
+  nodejs: "runtime",
+  redis: "cache",
+  nginx: "web",
+  apache: "web",
+  pm2: "manager",
+  python: "runtime",
+  java: "runtime"
+};
+
+export function categoriaPorId(id) {
+  return CATEGORIA_POR_ID[id] || "generic";
+}
+
 export function detectarTecnologia(nombre, tipoGenerico = "Proceso") {
 
   const normalizado = String(nombre || "").toLowerCase();

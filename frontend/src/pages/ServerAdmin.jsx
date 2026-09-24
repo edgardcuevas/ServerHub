@@ -14,6 +14,7 @@ import FileManager from "../components/servers/FileManager";
 import ServiceManager from "../components/servers/ServiceManager";
 import ProcessManager from "../components/servers/ProcessManager";
 import SystemActions from "../components/servers/SystemActions";
+import TechnologyPanel from "../components/servers/TechnologyPanel";
 
 function formatearRestante(ms) {
   const totalSegundos = Math.max(0, Math.floor(ms / 1000));
@@ -26,7 +27,8 @@ const TABS = [
   { id: "sistema", label: "Sistema" },
   { id: "servicios", label: "Servicios" },
   { id: "procesos", label: "Procesos" },
-  { id: "archivos", label: "Archivos" }
+  { id: "archivos", label: "Archivos" },
+  { id: "tecnologias", label: "Tecnologías" }
 ];
 
 function ServerAdmin() {
@@ -147,6 +149,7 @@ function ServerAdmin() {
             {activeTab === "servicios" && <ServiceManager serverId={id} adminToken={session.token} />}
             {activeTab === "procesos" && <ProcessManager serverId={id} adminToken={session.token} />}
             {activeTab === "archivos" && <FileManager serverId={id} adminToken={session.token} />}
+            {activeTab === "tecnologias" && <TechnologyPanel serverId={id} adminToken={session.token} />}
           </div>
         </div>
       </div>

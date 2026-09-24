@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Button from "./Button";
 
-function EditFileDialog({ fileName, initialContent, onCancel, onConfirm, loading = false }) {
+function EditFileDialog({ fileName, initialContent, onCancel, onConfirm, onDownload, loading = false }) {
 
   const [contenido, setContenido] = useState(initialContent);
 
@@ -27,10 +27,15 @@ function EditFileDialog({ fileName, initialContent, onCancel, onConfirm, loading
           />
         </label>
 
-        <div className="modal__actions">
+                <div className="modal__actions">
           <Button type="button" variant="ghost" onClick={onCancel}>
             Cancelar
           </Button>
+          {onDownload && (
+            <Button type="button" variant="ghost" onClick={onDownload} disabled={loading}>
+              Descargar
+            </Button>
+          )}
           <Button
             type="button"
             variant="primary"
