@@ -11,8 +11,15 @@ const {
 );
 
 const {
+    requireAdminSession
+} = require(
+    "../middlewares/admin-session.middleware"
+);
+
+const {
     createServerAdminSession,
-    logoutAdminSession
+    logoutAdminSession,
+    refreshServerAdminSession
 } = require(
     "../controllers/admin-session.controller"
 );
@@ -43,6 +50,25 @@ router.post(
     "/:id/admin-session/logout",
     authenticate,
     logoutAdminSession
+);
+
+/**
+ * La renovacion exige que la sesion siga siendo valida en el
+ * momento de la peticion, asi que requireAdminSession va
+ * delante. La escritura vuelve a comprobar las mismas
+ * condiciones en su UPDATE, de modo que la proteccion no
+ * depende solo del middleware.
+ *
+ * No lleva el limitador de desbloqueo: ese protege la
+ * verificacion de la contrasena administrativa, y aqui no se
+ * vuelve a verificar. Tampoco se vuelve a pedir la
+ * contrasena.
+ */
+router.post(
+    "/:id/admin-session/refresh",
+    authenticate,
+    requireAdminSession,
+    refreshServerAdminSession
 );
 
 module.exports = router;

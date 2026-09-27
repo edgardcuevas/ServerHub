@@ -72,6 +72,7 @@ const {
 const {
     createAdminSession,
     validateAdminSession,
+    refreshAdminSession,
     deleteAdminSession
 } = require(
     "../../src/services/admin-session.service"
@@ -377,6 +378,117 @@ async function createExpiredSession(
         );
 
     trackSession(result.rows[0].id);
+
+    return result.rows[0];
+
+}
+
+/**
+ * Fixture de una sesion con created_at y expires_at
+ * controlados. Necesaria para los casos de limite absoluto,
+ * que createAdminSession no permite construir.
+ */
+async function createSessionFixture(
+    options
+) {
+
+    const pool =
+        getTestPool();
+
+    const result =
+        await pool.query(
+            `
+            INSERT INTO admin_sessions
+            (
+                user_id,
+                server_id,
+                token,
+                expires_at,
+                created_at
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, token
+            `,
+            [
+                options.userId,
+                options.serverId,
+                crypto
+                    .randomBytes(32)
+                    .toString("hex"),
+                options.expiresAt,
+                options.createdAt
+            ]
+        );
+
+    trackSession(result.rows[0].id);
+
+    return result.rows[0];
+
+}
+
+/**
+ * Instantes de sesion en texto, tal como los devuelve
+ * PostgreSQL. Comparar texto de "timestamp without time
+ * zone" contra texto evita por completo el problema de la
+ * zona horaria, porque ambos proceden de la misma base de
+ * reloj del servidor.
+ */
+async function getSessionInstants(
+    sessionId
+) {
+
+    const pool =
+        getTestPool();
+
+    const result =
+        await pool.query(
+            `
+            SELECT
+                expires_at::text AS expires_at,
+                created_at::text AS created_at,
+                token
+            FROM admin_sessions
+            WHERE id = $1
+            `,
+            [sessionId]
+        );
+
+    return result.rows[0];
+
+}
+
+/**
+ * Comprobaciones del limite absoluto resueltas en SQL, que es
+ * donde se aplica la politica.
+ */
+async function getAbsoluteLimitState(
+    sessionId
+) {
+
+    const pool =
+        getTestPool();
+
+    const result =
+        await pool.query(
+            `
+            SELECT
+                (expires_at = created_at + INTERVAL '2 hours')
+                    AS limited_by_absolute,
+                (expires_at >
+                    CURRENT_TIMESTAMP + INTERVAL '14 minutes')
+                    AS extended_15_minutes,
+                (created_at + INTERVAL '2 hours'
+                    > CURRENT_TIMESTAMP)
+                    AS absolute_still_open,
+                (expires_at > CURRENT_TIMESTAMP)
+                    AS still_valid,
+                created_at + INTERVAL '2 hours'
+                    AS absolute_expires_at
+            FROM admin_sessions
+            WHERE id = $1
+            `,
+            [sessionId]
+        );
 
     return result.rows[0];
 
@@ -1179,6 +1291,641 @@ test(
                 session.id
             ),
             undefined
+        );
+
+    }
+);
+
+test(
+    "CASO 11: la renovaci�n extiende la expiracion y respeta el limite absoluto",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const antes =
+            await getSessionInstants(
+                session.id
+            );
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                session.token
+            );
+
+        assert.ok(renovada);
+        assert.equal(
+            renovada.id,
+            session.id
+        );
+        assert.equal(
+            renovada.user_id,
+            user.id
+        );
+        assert.equal(
+            renovada.server_id,
+            server.id
+        );
+
+        const despues =
+            await getSessionInstants(
+                session.id
+            );
+
+        assert.ok(
+            despues.expires_at >
+                antes.expires_at,
+            "expires_at debe aumentar"
+        );
+
+        assert.equal(
+            despues.token,
+            antes.token,
+            "el token no debe cambiar"
+        );
+
+        const limite =
+            await getAbsoluteLimitState(
+                session.id
+            );
+
+        assert.equal(
+            limite.absolute_still_open,
+            true
+        );
+
+        assert.equal(
+            limite.extended_15_minutes,
+            true,
+            "la renovacion debe extender 15 minutos"
+        );
+
+        assert.equal(
+            limite.limited_by_absolute,
+            false,
+            "aun no se ha alcanzado el maximo " +
+            "de 2 horas"
+        );
+
+        assert.ok(
+            limite.absolute_expires_at
+        );
+
+        /**
+         * Sigue siendo una sola fila.
+         */
+        const filas =
+            await getSessionCountByToken(
+                session.token
+            );
+
+        assert.equal(filas, 1);
+
+    }
+);
+
+test(
+    "CASO 12: renovar con otro usuario devuelve null y no cambia nada",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const antes =
+            await getSessionInstants(
+                session.id
+            );
+
+        const otroUsuario =
+            await createTestUser();
+
+        trackUser(otroUsuario.id);
+
+        const renovada =
+            await refreshAdminSession(
+                otroUsuario.id,
+                server.id,
+                session.token
+            );
+
+        assert.equal(
+            renovada,
+            null
+        );
+
+        const despues =
+            await getSessionInstants(
+                session.id
+            );
+
+        assert.equal(
+            despues.expires_at,
+            antes.expires_at
+        );
+
+        assert.ok(
+            await validateAdminSession(
+                user.id,
+                server.id,
+                session.token
+            )
+        );
+
+    }
+);
+
+test(
+    "CASO 13: renovar con otro servidor devuelve null y no cambia nada",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const antes =
+            await getSessionInstants(
+                session.id
+            );
+
+        const otroServidor =
+            await createTestServer({
+                userId: user.id
+            });
+
+        trackServer(otroServidor.id);
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                otroServidor.id,
+                session.token
+            );
+
+        assert.equal(
+            renovada,
+            null
+        );
+
+        const despues =
+            await getSessionInstants(
+                session.id
+            );
+
+        assert.equal(
+            despues.expires_at,
+            antes.expires_at
+        );
+
+    }
+);
+
+test(
+    "CASO 14: renovar con un token inexistente devuelve null y no cambia nada",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const antes =
+            await getSessionInstants(
+                session.id
+            );
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                crypto
+                    .randomBytes(32)
+                    .toString("hex")
+            );
+
+        assert.equal(
+            renovada,
+            null
+        );
+
+        const despues =
+            await getSessionInstants(
+                session.id
+            );
+
+        assert.equal(
+            despues.expires_at,
+            antes.expires_at
+        );
+
+        assert.equal(
+            despues.token,
+            session.token
+        );
+
+    }
+);
+
+test(
+    "CASO 15: una sesion expirada no se revive",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const expirada =
+            await createSessionFixture({
+                userId: user.id,
+                serverId: server.id,
+                expiresAt:
+                    new Date(
+                        Date.now() -
+                        60 * 60 * 1000
+                    ),
+                createdAt:
+                    new Date(
+                        Date.now() -
+                        3 * 60 * 60 * 1000
+                    )
+            });
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                expirada.token
+            );
+
+        assert.equal(
+            renovada,
+            null
+        );
+
+        /**
+         * La fila sigue igual: ni se revive ni se borra.
+         */
+        const estado =
+            await getAbsoluteLimitState(
+                expirada.id
+            );
+
+        assert.equal(
+            estado.still_valid,
+            false
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                expirada.token
+            ),
+            1
+        );
+
+    }
+);
+
+test(
+    "CASO 16: una sesion eliminada no se puede renovar",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const borrada =
+            await deleteAdminSession(
+                user.id,
+                server.id,
+                session.token
+            );
+
+        assert.equal(borrada, true);
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                session.token
+            );
+
+        assert.equal(
+            renovada,
+            null,
+            "no debe recrear la sesion"
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                session.token
+            ),
+            0
+        );
+
+    }
+);
+
+test(
+    "CASO 17: con el limite absoluto vencido no se renueva aunque expires_at siga en el futuro",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        /**
+         * created_at hace mas de 2 horas y expires_at sigue
+         * en el futuro. Un expires_at vigente NO basta para
+         * renovar.
+         */
+        const vencida =
+            await createSessionFixture({
+                userId: user.id,
+                serverId: server.id,
+                expiresAt:
+                    new Date(
+                        Date.now() +
+                        5 * 60 * 1000
+                    ),
+                createdAt:
+                    new Date(
+                        Date.now() -
+                        (3 * 60 * 60 * 1000)
+                    )
+            });
+
+        const estadoPrevio =
+            await getAbsoluteLimitState(
+                vencida.id
+            );
+
+        assert.equal(
+            estadoPrevio.still_valid,
+            true,
+            "la sesion parece vigente"
+        );
+
+        assert.equal(
+            estadoPrevio.absolute_still_open,
+            false,
+            "pero el limite absoluto ya termino"
+        );
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                vencida.token
+            );
+
+        assert.equal(
+            renovada,
+            null
+        );
+
+    }
+);
+
+test(
+    "CASO 18: cerca del limite absoluto la renovacion queda topeada",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        /**
+         * created_at hace 1 hora y 55 minutos: quedan 5
+         * minutos para el maximo absoluto, muy por debajo de
+         * los 15 minutos de extension.
+         */
+        const cerca =
+            await createSessionFixture({
+                userId: user.id,
+                serverId: server.id,
+                expiresAt:
+                    new Date(
+                        Date.now() +
+                        4 * 60 * 1000
+                    ),
+                createdAt:
+                    new Date(
+                        Date.now() -
+                        (
+                            60 * 60 * 1000 +
+                            55 * 60 * 1000
+                        )
+                    )
+            });
+
+        const previa =
+            await getAbsoluteLimitState(
+                cerca.id
+            );
+
+        assert.equal(
+            previa.absolute_still_open,
+            true
+        );
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                cerca.token
+            );
+
+        assert.ok(
+            renovada,
+            "la renovacion funciona si el limite " +
+            "aun no termina"
+        );
+
+        const limite =
+            await getAbsoluteLimitState(
+                cerca.id
+            );
+
+        assert.equal(
+            limite.limited_by_absolute,
+            true,
+            "expires_at debe quedar exactamente en " +
+            "created_at + 2 horas"
+        );
+
+        assert.equal(
+            limite.extended_15_minutes,
+            false,
+            "no debe quedar 15 minutos despues, " +
+            "porque eso superaria las 2 horas"
+        );
+
+        assert.equal(
+            limite.still_valid,
+            true
+        );
+
+    }
+);
+
+test(
+    "CASO 19: renovaciones sucesivas no crean filas ni superan el limite",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const session =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const pool =
+            getTestPool();
+
+        const conteoInicial =
+            await pool.query(
+                `
+                SELECT count(*)::int AS total
+                FROM admin_sessions
+                WHERE user_id = $1
+                AND server_id = $2
+                `,
+                [user.id, server.id]
+            );
+
+        assert.equal(
+            conteoInicial.rows[0].total,
+            1
+        );
+
+        let ultima =
+            await getSessionInstants(
+                session.id
+            );
+
+        for (
+            let vuelta = 0;
+            vuelta < 4;
+            vuelta += 1
+        ) {
+
+            const renovada =
+                await refreshAdminSession(
+                    user.id,
+                    server.id,
+                    session.token
+                );
+
+            assert.ok(renovada);
+
+            const ahora =
+                await getSessionInstants(
+                    session.id
+                );
+
+            assert.ok(
+                ahora.expires_at >
+                    ahora.created_at
+            );
+
+            assert.ok(
+                ahora.expires_at >=
+                    ultima.expires_at,
+                "cada renovacion no debe retroceder"
+            );
+
+            assert.equal(
+                ahora.token,
+                session.token
+            );
+
+            ultima = ahora;
+
+        }
+
+        const limite =
+            await getAbsoluteLimitState(
+                session.id
+            );
+
+        assert.equal(
+            limite.limited_by_absolute,
+            false
+        );
+
+        assert.equal(
+            limite.still_valid,
+            true
+        );
+
+        const conteoFinal =
+            await pool.query(
+                `
+                SELECT count(*)::int AS total
+                FROM admin_sessions
+                WHERE user_id = $1
+                AND server_id = $2
+                `,
+                [user.id, server.id]
+            );
+
+        assert.equal(
+            conteoFinal.rows[0].total,
+            1,
+            "sigue habiendo una sola sesion"
         );
 
     }
