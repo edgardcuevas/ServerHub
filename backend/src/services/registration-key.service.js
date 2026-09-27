@@ -1,21 +1,14 @@
-const crypto = require("crypto");
 const pool = require("../config/db");
+const {
+    generateRegistrationKey
+} = require(
+    "../utils/registration-key.util"
+);
 const {
     createAuditLog
 } = require("./audit.service");
 
-function generateKey() {
 
-    const part1 = crypto.randomBytes(2)
-        .toString("hex")
-        .toUpperCase();
-
-    const part2 = crypto.randomBytes(2)
-        .toString("hex")
-        .toUpperCase();
-
-    return `SHUB-${part1}-${part2}`;
-}
 
 async function createKey(userId, serverId) {
 
@@ -24,6 +17,28 @@ async function createKey(userId, serverId) {
     try {
 
         await client.query("BEGIN");
+
+        const serverResult =
+    await client.query(
+        `
+        SELECT id
+        FROM servers
+        WHERE id = $1
+        AND user_id = $2
+        `,
+        [
+            serverId,
+            userId
+        ]
+    );
+
+if (
+    serverResult.rows.length === 0
+) {
+    throw new Error(
+        "Servidor no encontrado"
+    );
+}
 
         const agentResult = await client.query(
             `
@@ -50,7 +65,8 @@ async function createKey(userId, serverId) {
             [serverId]
         );
 
-        const registrationKey = generateKey();
+        const registrationKey = generateRegistrationKey();
+
 
         const expiresAt = new Date();
 
@@ -81,7 +97,8 @@ async function createKey(userId, serverId) {
         await createAuditLog(
             "REGISTRATION_KEY_CREATED",
             {
-                registrationKey,
+                registrationKeyId:
+                    result.rows[0].id,
                 serverId,
                 expiresAt
             },

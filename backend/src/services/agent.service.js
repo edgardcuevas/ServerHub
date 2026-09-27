@@ -31,6 +31,7 @@ async function registerAgent(data) {
             SELECT *
             FROM registration_keys
             WHERE registration_key = $1
+            FOR UPDATE
             `,
             [registrationKey]
         );
@@ -101,21 +102,30 @@ async function registerAgent(data) {
             ]
         );
 
-        await client.query(
-            `
-            UPDATE registration_keys
-            SET is_used = true
-            WHERE id = $1
-            `,
-            [key.id]
-        );
+        const keyUpdateResult =
+            await client.query(
+                `
+                UPDATE registration_keys
+                SET is_used = true
+                WHERE id = $1
+                AND is_used = false
+                `,
+                [
+                    key.id
+                ]
+            );
+
+        if (
+            keyUpdateResult.rowCount !== 1
+        ) {
+            throw new Error(
+                "Clave ya utilizada"
+            );
+        }
 
         await createAuditLog(
             "REGISTRATION_KEY_USED",
             {
-                registrationKey:
-                    registrationKey,
-
                 registrationKeyId:
                     key.id,
 
@@ -397,7 +407,6 @@ async function refreshToken(agentId) {
     "AGENT_TOKEN_REFRESHED",
     {
         agentId,
-        newToken,
         expiresAt: tokenExpiresAt
     }
 );
