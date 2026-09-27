@@ -433,6 +433,33 @@ async function createSessionFixture(
  * zona horaria, porque ambos proceden de la misma base de
  * reloj del servidor.
  */
+/**
+ * Conteo acotado a una combinacion usuario y servidor, que es
+ * la unidad de la politica de una sola sesion activa.
+ */
+async function countSessionsOf(
+    userId,
+    serverId
+) {
+
+    const pool =
+        getTestPool();
+
+    const result =
+        await pool.query(
+            `
+            SELECT count(*)::int AS total
+            FROM admin_sessions
+            WHERE user_id = $1
+            AND server_id = $2
+            `,
+            [userId, serverId]
+        );
+
+    return result.rows[0].total;
+
+}
+
 async function getSessionInstants(
     sessionId
 ) {
@@ -596,8 +623,15 @@ test(
     }
 );
 
+/**
+ * CASO 2A: el segundo desbloqueo del mismo usuario y servidor
+ * sustituye al primero.
+ *
+ * Sustituye al antiguo CASO 2, que documentaba varias
+ * sesiones simultaneas. Esa politica ya no es la vigente.
+ */
 test(
-    "CASO 2: se permiten varias sesiones simultáneas para el mismo usuario y servidor",
+    "CASO 2A: el segundo desbloqueo reemplaza al primero",
     async () => {
 
         const {
@@ -628,27 +662,23 @@ test(
             segunda.token
         );
 
-        assert.ok(
-            await getSessionRowById(
-                primera.id
-            )
-        );
-
-        assert.ok(
-            await getSessionRowById(
-                segunda.id
-            )
-        );
-
         /**
-         * UNIQUE(token) sigue satisfecho: son tokens
-         * distintos, no una violacion.
+         * Solo queda la fila de la segunda sesion.
          */
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                server.id
+            ),
+            1
+        );
+
         assert.equal(
             await getSessionCountByToken(
                 primera.token
             ),
-            1
+            0,
+            "la fila anterior debe eliminarse"
         );
 
         assert.equal(
@@ -658,17 +688,472 @@ test(
             1
         );
 
-        const validada =
+        /**
+         * El token anterior deja de validar y el nuevo
+         * valida. La invalidacion es por ausencia de fila,
+         * no por marca de revocacion.
+         */
+        const validadaAntes =
+            await validateAdminSession(
+                user.id,
+                server.id,
+                primera.token
+            );
+
+        assert.equal(
+            validadaAntes,
+            null
+        );
+
+        const validadaDespues =
             await validateAdminSession(
                 user.id,
                 server.id,
                 segunda.token
             );
 
-        assert.ok(validada);
+        assert.ok(validadaDespues);
         assert.equal(
-            validada.id,
+            validadaDespues.id,
             segunda.id
+        );
+
+        /**
+         * Y la fila superviviente es la segunda.
+         */
+        const fila =
+            await getSessionRowById(
+                segunda.id
+            );
+
+        assert.ok(fila);
+        assert.equal(
+            fila.user_id,
+            user.id
+        );
+        assert.equal(
+            fila.server_id,
+            server.id
+        );
+
+    }
+);
+
+test(
+    "CASO 2B: otro servidor del mismo usuario no queda afectado",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const otroServidor =
+            await createTestServer({
+                userId: user.id
+            });
+
+        trackServer(otroServidor.id);
+
+        const sesionA =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const sesionB =
+            await createSessionFor(
+                user.id,
+                otroServidor.id
+            );
+
+        /**
+         * Reabrir el servidor A no debe tocar la sesion del
+         * servidor B.
+         */
+        const nuevaA =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                server.id
+            ),
+            1
+        );
+
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                otroServidor.id
+            ),
+            1
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                sesionB.token
+            ),
+            1,
+            "la sesion del otro servidor permanece"
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                sesionA.token
+            ),
+            0
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                nuevaA.token
+            ),
+            1
+        );
+
+        const validaA =
+            await validateAdminSession(
+                user.id,
+                server.id,
+                nuevaA.token
+            );
+
+        assert.ok(validaA);
+
+        const validaB =
+            await validateAdminSession(
+                user.id,
+                otroServidor.id,
+                sesionB.token
+            );
+
+        assert.ok(
+            validaB,
+            "el otro servidor conserva su sesion"
+        );
+
+        assert.equal(
+            validaB.id,
+            sesionB.id
+        );
+
+    }
+);
+
+test(
+    "CASO 2C: otro usuario no queda afectado",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const otroUsuario =
+            await createTestUser();
+
+        trackUser(otroUsuario.id);
+
+        const suServidor =
+            await createTestServer({
+                userId: otroUsuario.id
+            });
+
+        trackServer(suServidor.id);
+
+        const sesionPropia =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const sesionAjena =
+            await createSessionFor(
+                otroUsuario.id,
+                suServidor.id
+            );
+
+        /**
+         * Reabrir la sesion del usuario A solo sustituye la
+         * suya.
+         */
+        const nuevaPropia =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        assert.equal(
+            await getSessionCountByToken(
+                sesionAjena.token
+            ),
+            1,
+            "la sesion de otro usuario permanece"
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                sesionPropia.token
+            ),
+            0
+        );
+
+        assert.equal(
+            await getSessionCountByToken(
+                nuevaPropia.token
+            ),
+            1
+        );
+
+        const validaAjena =
+            await validateAdminSession(
+                otroUsuario.id,
+                suServidor.id,
+                sesionAjena.token
+            );
+
+        assert.ok(validaAjena);
+        assert.equal(
+            validaAjena.id,
+            sesionAjena.id
+        );
+
+    }
+);
+
+test(
+    "CASO 2D: tras cada reemplazo solo el token más reciente valida",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const tokens = [];
+
+        for (
+            let vuelta = 0;
+            vuelta < 4;
+            vuelta += 1
+        ) {
+
+            const sesion =
+                await createSessionFor(
+                    user.id,
+                    server.id
+                );
+
+            tokens.push(
+                sesion.token
+            );
+
+            assert.equal(
+                await countSessionsOf(
+                    user.id,
+                    server.id
+                ),
+                1,
+                "siempre una sola fila"
+            );
+
+            /**
+             * Todos los tokens anteriores deben haber
+             * dejado de validar, y el recien creado debe
+             * validar.
+             */
+            for (
+                let indice = 0;
+                indice < tokens.length - 1;
+                indice += 1
+            ) {
+
+                const validada =
+                    await validateAdminSession(
+                        user.id,
+                        server.id,
+                        tokens[indice]
+                    );
+
+                assert.equal(
+                    validada,
+                    null,
+                    `el token de la vuelta ` +
+                    `${indice} no debe validar`
+                );
+
+            }
+
+            const actual =
+                await validateAdminSession(
+                    user.id,
+                    server.id,
+                    sesion.token
+                );
+
+            assert.ok(actual);
+
+        }
+
+        assert.equal(
+            tokens.length,
+            4
+        );
+
+        const total =
+            await countSessionsOf(
+                user.id,
+                server.id
+            );
+
+        assert.equal(
+            total,
+            1
+        );
+
+    }
+);
+
+test(
+    "CASO 2E: el refresh de la sesión nueva sigue funcionando",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const antigua =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const nueva =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const renovada =
+            await refreshAdminSession(
+                user.id,
+                server.id,
+                nueva.token
+            );
+
+        assert.ok(renovada);
+
+        const despues =
+            await getSessionInstants(
+                nueva.id
+            );
+
+        assert.equal(
+            despues.token,
+            nueva.token,
+            "el refresh no rota el token"
+        );
+
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                server.id
+            ),
+            1
+        );
+
+        /**
+         * La sesion antigua sigue invalida tras el refresh.
+         */
+        const validadaAntigua =
+            await validateAdminSession(
+                user.id,
+                server.id,
+                antigua.token
+            );
+
+        assert.equal(
+            validadaAntigua,
+            null
+        );
+
+    }
+);
+
+test(
+    "CASO 2F: el logout afecta únicamente a la sesión actual",
+    async () => {
+
+        const {
+            user,
+            server
+        } =
+            await createScenario();
+
+        const antigua =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        const nueva =
+            await createSessionFor(
+                user.id,
+                server.id
+            );
+
+        /**
+         * El token antiguo ya no cierra nada, porque su fila
+         * no existe.
+         */
+        const conAntiguo =
+            await deleteAdminSession(
+                user.id,
+                server.id,
+                antigua.token
+            );
+
+        assert.equal(
+            conAntiguo,
+            false
+        );
+
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                server.id
+            ),
+            1,
+            "la sesion nueva permanece"
+        );
+
+        const conNuevo =
+            await deleteAdminSession(
+                user.id,
+                server.id,
+                nueva.token
+            );
+
+        assert.equal(
+            conNuevo,
+            true
+        );
+
+        assert.equal(
+            await countSessionsOf(
+                user.id,
+                server.id
+            ),
+            0
         );
 
     }
@@ -1153,8 +1638,18 @@ test(
     }
 );
 
+/**
+ * CASO 8F: cerrar una sesión no afecta a las de OTRO
+ * servidor del mismo usuario.
+ *
+ * Antes este caso usaba dos sesiones del mismo servidor, lo
+ * que ya es imposible bajo la politica de una sola sesion
+ * activa. La garantia equivalente ahora es que el cierre es
+ * tan acotado como la propia politica: afecta a la fila que
+ * coincide con usuario, servidor y token, y a nada mas.
+ */
 test(
-    "CASO 8F: cerrar una sesión no afecta a las demás del mismo usuario",
+    "CASO 8F: cerrar una sesión no afecta a otro servidor del mismo usuario",
     async () => {
 
         const {
@@ -1163,23 +1658,30 @@ test(
         } =
             await createScenario();
 
-        const primera =
+        const otroServidor =
+            await createTestServer({
+                userId: user.id
+            });
+
+        trackServer(otroServidor.id);
+
+        const enEste =
             await createSessionFor(
                 user.id,
                 server.id
             );
 
-        const segunda =
+        const enOtro =
             await createSessionFor(
                 user.id,
-                server.id
+                otroServidor.id
             );
 
         const deleted =
             await deleteAdminSession(
                 user.id,
                 server.id,
-                primera.token
+                enEste.token
             );
 
         assert.equal(
@@ -1189,17 +1691,31 @@ test(
 
         assert.equal(
             await getSessionCountByToken(
-                primera.token
+                enEste.token
             ),
             0
         );
 
         assert.equal(
             await getSessionCountByToken(
-                segunda.token
+                enOtro.token
             ),
             1,
-            "la otra sesión debe permanecer"
+            "la sesión del otro servidor " +
+            "debe permanecer"
+        );
+
+        const valida =
+            await validateAdminSession(
+                user.id,
+                otroServidor.id,
+                enOtro.token
+            );
+
+        assert.ok(valida);
+        assert.equal(
+            valida.id,
+            enOtro.id
         );
 
     }
