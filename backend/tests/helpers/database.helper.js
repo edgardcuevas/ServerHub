@@ -91,6 +91,50 @@ const REGISTRATION_KEY_EVENTS = [
 const AGENT_TOKEN_REFRESHED_EVENT =
     "AGENT_TOKEN_REFRESHED";
 
+/**
+ * Eventos de sesion administrativa que emite
+ * admin-session.service.
+ *
+ * Los tres llevan userId y serverId en details, y ademas
+ * adminSessionId. La limpieza se acota por esos campos,
+ * nunca por event_type en global: un DELETE sin filtro
+ * borraria las auditorias de pruebas que se ejecutan en
+ * paralelo, porque audit_logs no tiene clave foranea ni se
+ * limpia en cascada con el servidor.
+ *
+ * Los tres eventos comparten el adminSessionId de la fila
+ * real de admin_sessions, asi que se pueden acotar juntos.
+ *
+ * Un id de sesion puede no estar en sessionIds si la prueba
+ * no lo conservo, por ejemplo cuando el cierre ya borro la
+ * fila. Por eso la limpieza tambien acepta userId y
+ * serverId, que siempre estan disponibles.
+ */
+const ADMIN_SESSION_EVENTS = [
+    "ADMIN_SESSION_CREATED",
+    "ADMIN_SESSION_REFRESHED",
+    "ADMIN_SESSION_CLOSED"
+];
+
+/**
+ * Propiedades que jamas deben aparecer en details de un
+ * evento de sesion administrativa. Las usan las pruebas de
+ * busqueda negativa de secretos como predicado SQL.
+ */
+const FORBIDDEN_AUDIT_KEYS = [
+    "token",
+    "adminSessionToken",
+    "password",
+    "adminPassword",
+    "authorization",
+    "headers",
+    "body",
+    "tokenPrefix",
+    "tokenSuffix",
+    "tokenHash",
+    "tokenFingerprint"
+];
+
 const SAFE_ERROR_MESSAGE =
     "Las pruebas de integración requieren una base de datos exclusiva configurada en DATABASE_URL_TEST";
 
@@ -804,6 +848,65 @@ async function cleanupTestData(
 
         }
 
+        /**
+         * Auditoria de sesion administrativa.
+         *
+         * Se acota por adminSessionId cuando se conocen los
+         * ids, y por userId + serverId cuando no. Nunca se
+         * borra por event_type en global, para no tocar las
+         * auditorias de pruebas paralelas.
+         */
+        if (
+            sessionIds.length > 0
+        ) {
+
+            await client.query(
+                `
+                DELETE FROM audit_logs
+                WHERE event_type = ANY($1::text[])
+                AND details->>'adminSessionId'
+                    = ANY($2::text[])
+                `,
+                [
+                    ADMIN_SESSION_EVENTS,
+                    sessionIds.map(
+                        value =>
+                            String(value)
+                    )
+                ]
+            );
+
+        }
+
+        if (
+            userIds.length > 0
+            && serverIds.length > 0
+        ) {
+
+            await client.query(
+                `
+                DELETE FROM audit_logs
+                WHERE event_type = ANY($1::text[])
+                AND details->>'userId'
+                    = ANY($2::text[])
+                AND details->>'serverId'
+                    = ANY($3::text[])
+                `,
+                [
+                    ADMIN_SESSION_EVENTS,
+                    userIds.map(
+                        value =>
+                            String(value)
+                    ),
+                    serverIds.map(
+                        value =>
+                            String(value)
+                    )
+                ]
+            );
+
+        }
+
         if (
             serverIds.length > 0
         ) {
@@ -923,6 +1026,8 @@ async function closeTestPool() {
 
 module.exports = {
     SAFE_ERROR_MESSAGE,
+    ADMIN_SESSION_EVENTS,
+    FORBIDDEN_AUDIT_KEYS,
     getSafeConfigurationSummary,
     getExpectedDatabaseName,
     getTestPool,

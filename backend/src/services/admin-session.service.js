@@ -2,6 +2,12 @@ const crypto = require("crypto");
 
 const pool = require("../config/db");
 
+const {
+    createAuditLog
+} = require(
+    "./audit.service"
+);
+
 /**
  * Codigo SQLSTATE de violacion de unicidad.
  */
@@ -49,8 +55,23 @@ const TOKEN_CONFLICT_ERROR =
  * toca las sesiones del mismo usuario en otros servidores, ni
  * las de otros usuarios, ni nada global.
  *
- * No se registra nada en auditoria y en particular no se
- * registra ningun token.
+ * AUDITORIA
+ *
+ * El alta y su evento ADMIN_SESSION_CREATED se escriben en la
+ * MISMA transaccion y sobre el MISMO client, y el evento se
+ * emite antes del COMMIT. Si la auditoria falla, el ROLLBACK
+ * revierte tanto el INSERT como el DELETE: ni la sesion nueva
+ * persiste, ni se pierden las anteriores.
+ *
+ * replacedSessions recoge el rowCount del DELETE, de modo que
+ * el evento dice si la sesion nueva sustituyo a otra o si fue
+ * la primera. No se guarda ningun identificador de las
+ * sesiones anteriores.
+ *
+ * El evento se correlaciona por adminSessionId, userId,
+ * serverId y las dos fechas de expiracion. NO se registra el
+ * token, ni un fragmento suyo, ni su huella, ni la contrasena
+ * administrativa, ni ningun cuerpo de peticion.
  */
 async function createAdminSession(
     userId,
@@ -66,18 +87,27 @@ async function createAdminSession(
             "BEGIN"
         );
 
-        await client.query(
-            `
-            DELETE
-            FROM admin_sessions
-            WHERE user_id = $1
-            AND server_id = $2
-            `,
-            [
-                userId,
-                serverId
-            ]
-        );
+        /**
+         * El resultado del DELETE se conserva para poder
+         * informar de cuantas sesiones se sustituyen. Solo se
+         * lee rowCount: no se conserva ninguna fila previa.
+         */
+        const deleteResult =
+            await client.query(
+                `
+                DELETE
+                FROM admin_sessions
+                WHERE user_id = $1
+                AND server_id = $2
+                `,
+                [
+                    userId,
+                    serverId
+                ]
+            );
+
+        const replacedSessions =
+            deleteResult.rowCount;
 
         const token =
             crypto.randomBytes(32)
@@ -91,6 +121,20 @@ async function createAdminSession(
                 )
             );
 
+        /**
+         * absolute_expires_at lo calcula PostgreSQL con la
+         * misma base de reloj que created_at, en lugar de
+         * sumarle 2 horas en JavaScript: asi el limite
+         * absoluto de la auditoria coincide con el que
+         * aplica refreshAdminSession, sin depender de la zona
+         * horaria de Node ni del redondeo de un Date.
+         *
+         * Se listan las columnas en vez de usar RETURNING *
+         * para dejar el contrato explicito. token sigue
+         * devolviendose porque createServerAdminSession lo
+         * entrega al cliente en su respuesta; lo que no se
+         * hace es llevarlo a la auditoria.
+         */
         const result =
             await client.query(
                 `
@@ -108,7 +152,16 @@ async function createAdminSession(
                     $3,
                     $4
                 )
-                RETURNING *
+                RETURNING
+                    id,
+                    user_id,
+                    server_id,
+                    token,
+                    expires_at,
+                    created_at,
+                    created_at
+                        + INTERVAL '2 hours'
+                        AS absolute_expires_at
                 `,
                 [
                     userId,
@@ -118,11 +171,30 @@ async function createAdminSession(
                 ]
             );
 
+        const session =
+            result.rows[0];
+
+        await createAuditLog(
+            "ADMIN_SESSION_CREATED",
+            {
+                adminSessionId:
+                    session.id,
+                userId,
+                serverId,
+                expiresAt:
+                    session.expires_at,
+                absoluteExpiresAt:
+                    session.absolute_expires_at,
+                replacedSessions
+            },
+            client
+        );
+
         await client.query(
             "COMMIT"
         );
 
-        return result.rows[0];
+        return session;
 
     } catch (error) {
 
@@ -250,9 +322,24 @@ async function validateAdminSession(
  * y una sesion cuyo limite absoluto ya vencio tampoco, aun
  * cuando su expires_at siga en el futuro.
  *
- * Es una sola sentencia, asi que no lleva transaccion. No
- * registra nada en auditoria y en particular no registra el
- * token.
+ * AUDITORIA
+ *
+ * Antes era una sola sentencia con pool.query() y sin
+ * transaccion. Ahora usa un client propio con BEGIN, porque
+ * la renovacion y su evento ADMIN_SESSION_REFRESHED tienen
+ * que ser atomicos: si la auditoria falla, el ROLLBACK
+ * devuelve expires_at a su valor anterior y la sesion sigue
+ * vigente con la expiracion que tenia.
+ *
+ * El evento solo se emite si el UPDATE renovo algo. Un token
+ * inexistente, de otro usuario o de otro servidor, una sesion
+ * expirada o una cuyo limite absoluto ya vencio devuelven
+ * null, hacen ROLLBACK y NO dejan rastro: un intento
+ * fallido no es un evento de sesion.
+ *
+ * Se conservan sin cambio todas las condiciones del UPDATE,
+ * el limite absoluto de 2 horas, el token intacto y el
+ * contrato result.rows[0] || null.
  */
 async function refreshAdminSession(
     userId,
@@ -260,37 +347,99 @@ async function refreshAdminSession(
     token
 ) {
 
-    const result =
-        await pool.query(
-            `
-            UPDATE admin_sessions
-            SET expires_at = LEAST(
-                CURRENT_TIMESTAMP + INTERVAL '15 minutes',
-                created_at + INTERVAL '2 hours'
-            )
-            WHERE user_id = $1
-            AND server_id = $2
-            AND token = $3
-            AND expires_at > CURRENT_TIMESTAMP
-            AND created_at + INTERVAL '2 hours'
-                > CURRENT_TIMESTAMP
-            RETURNING
-                id,
-                user_id,
-                server_id,
-                expires_at,
-                created_at,
-                created_at + INTERVAL '2 hours'
-                    AS absolute_expires_at
-            `,
-            [
-                userId,
-                serverId,
-                token
-            ]
+    const client =
+        await pool.connect();
+
+    try {
+
+        await client.query(
+            "BEGIN"
         );
 
-    return result.rows[0] || null;
+        const result =
+            await client.query(
+                `
+                UPDATE admin_sessions
+                SET expires_at = LEAST(
+                    CURRENT_TIMESTAMP
+                        + INTERVAL '15 minutes',
+                    created_at + INTERVAL '2 hours'
+                )
+                WHERE user_id = $1
+                AND server_id = $2
+                AND token = $3
+                AND expires_at > CURRENT_TIMESTAMP
+                AND created_at + INTERVAL '2 hours'
+                    > CURRENT_TIMESTAMP
+                RETURNING
+                    id,
+                    user_id,
+                    server_id,
+                    expires_at,
+                    created_at,
+                    created_at
+                        + INTERVAL '2 hours'
+                        AS absolute_expires_at
+                `,
+                [
+                    userId,
+                    serverId,
+                    token
+                ]
+            );
+
+        const session =
+            result.rows[0] || null;
+
+        /**
+         * Sin fila renovada no hay evento. Se hace ROLLBACK
+         * porque la transaccion no ha modificado nada, y asi
+         * se cierra sin dejar ninguna sentencia abierta.
+         */
+        if (!session) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+            return null;
+
+        }
+
+        await createAuditLog(
+            "ADMIN_SESSION_REFRESHED",
+            {
+                adminSessionId:
+                    session.id,
+                userId,
+                serverId,
+                expiresAt:
+                    session.expires_at,
+                absoluteExpiresAt:
+                    session.absolute_expires_at
+            },
+            client
+        );
+
+        await client.query(
+            "COMMIT"
+        );
+
+        return session;
+
+    } catch (error) {
+
+        await client.query(
+            "ROLLBACK"
+        );
+
+        throw error;
+
+    } finally {
+
+        client.release();
+
+    }
 
 }
 
@@ -303,9 +452,26 @@ async function refreshAdminSession(
  * user_id, server_id y token es requisito, y si no
  * ocurre no se borra nada.
  *
- * No se envuelve en transaccion: es una sola sentencia.
- * No se registra nada en auditoria, y en particular no se
- * registra el token.
+ * AUDITORIA
+ *
+ * El DELETE va en transaccion con su evento
+ * ADMIN_SESSION_CLOSED, sobre el mismo client y antes del
+ * COMMIT. Si la auditoria falla, el ROLLBACK restituye la
+ * fila: la sesion sigue existiendo y sigue siendo valida.
+ *
+ * Para auditar el cierre sin guardar el token, el RETURNING
+ * pide solo informacion segura de la fila eliminada: id,
+ * user_id, server_id, expires_at y created_at. El token no
+ * se pide, no se copia a ninguna variable y no llega a la
+ * auditoria, ni completo ni enmascarado.
+ *
+ * Sin fila eliminada no hay evento: un token inexistente, de
+ * otro usuario o de otro servidor devuelve false, hace
+ * ROLLBACK y no deja rastro, para no permitir enumerar
+ * sesiones ajenas por la existencia de un evento.
+ *
+ * Se mantiene el contrato booleano: true si se cerro y
+ * false si no habia coincidencia.
  */
 async function deleteAdminSession(
     userId,
@@ -313,24 +479,82 @@ async function deleteAdminSession(
     token
 ) {
 
-    const result =
-        await pool.query(
-            `
-            DELETE
-            FROM admin_sessions
-            WHERE user_id = $1
-            AND server_id = $2
-            AND token = $3
-            RETURNING id
-            `,
-            [
-                userId,
-                serverId,
-                token
-            ]
+    const client =
+        await pool.connect();
+
+    try {
+
+        await client.query(
+            "BEGIN"
         );
 
-    return result.rowCount === 1;
+        const result =
+            await client.query(
+                `
+                DELETE
+                FROM admin_sessions
+                WHERE user_id = $1
+                AND server_id = $2
+                AND token = $3
+                RETURNING
+                    id,
+                    user_id,
+                    server_id,
+                    expires_at,
+                    created_at
+                `,
+                [
+                    userId,
+                    serverId,
+                    token
+                ]
+            );
+
+        const deletedSession =
+            result.rows[0] || null;
+
+        if (!deletedSession) {
+
+            await client.query(
+                "ROLLBACK"
+            );
+
+            return false;
+
+        }
+
+        await createAuditLog(
+            "ADMIN_SESSION_CLOSED",
+            {
+                adminSessionId:
+                    deletedSession.id,
+                userId,
+                serverId,
+                expiresAt:
+                    deletedSession.expires_at
+            },
+            client
+        );
+
+        await client.query(
+            "COMMIT"
+        );
+
+        return true;
+
+    } catch (error) {
+
+        await client.query(
+            "ROLLBACK"
+        );
+
+        throw error;
+
+    } finally {
+
+        client.release();
+
+    }
 
 }
 
