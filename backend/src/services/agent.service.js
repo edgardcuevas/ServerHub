@@ -10,6 +10,31 @@ const {
     resolveAlert
 } = require("./alert.service");
 
+/**
+ * Codigo SQLSTATE de violacion de unicidad.
+ */
+const UNIQUE_VIOLATION_CODE =
+    "23505";
+
+/**
+ * Nombres reales de las restricciones unicas de agents,
+ * obtenidos de pg_indexes en la base.
+ */
+const AGENT_SERVER_UNIQUE =
+    "agents_server_id_key";
+
+const AGENT_TOKEN_UNIQUE =
+    "agents_agent_token_key";
+
+const AGENT_ALREADY_LINKED_ERROR =
+    "Este servidor ya tiene un agente vinculado";
+
+const AGENT_CREDENTIALS_CONFLICT_ERROR =
+    "Conflicto al generar las credenciales del agente";
+
+const AGENT_REGISTRATION_CONFLICT_ERROR =
+    "Conflicto al registrar el agente";
+
 async function registerAgent(data) {
 
     const client = await pool.connect();
@@ -169,13 +194,72 @@ async function registerAgent(data) {
 
         await client.query("ROLLBACK");
 
-        throw error;
+        throw normalizeRegistrationError(error);
 
     } finally {
 
         client.release();
 
     }
+}
+
+/**
+ * Traduce los errores de PostgreSQL que pueden escaping de
+ * registerAgent por colisiones de indices unicos.
+ *
+ * El controlador responde con error.message, asi que el
+ * mensaje crudo de PostgreSQL llegaria al cliente HTTP con
+ * nombres de restricciones, detalles del motor y texto
+ * tecnico. El 23505 de agents.server_id es real: se
+ * reproduce de forma determinista cuando un servidor ya
+ * tiene agente y se vuelve a intentar el registro.
+ *
+ * La traduccion es deliberadamente conservadora. Cada
+ * restriccion conocida tiene su propio mensaje, y cualquier
+ * 23505 no reconocido recibe un texto generico. Nunca se
+ * devuelve el mensaje original de PostgreSQL.
+ *
+ * Los errores que no son 23505 se propagan intactos, de
+ * modo que el ROLLBACK y el comportamiento del resto del
+ * flujo no cambian.
+ */
+function normalizeRegistrationError(error) {
+
+    if (
+        !error ||
+        error.code !== UNIQUE_VIOLATION_CODE
+    ) {
+
+        return error;
+
+    }
+
+    if (
+        error.constraint
+        === AGENT_SERVER_UNIQUE
+    ) {
+
+        return new Error(
+            AGENT_ALREADY_LINKED_ERROR
+        );
+
+    }
+
+    if (
+        error.constraint
+        === AGENT_TOKEN_UNIQUE
+    ) {
+
+        return new Error(
+            AGENT_CREDENTIALS_CONFLICT_ERROR
+        );
+
+    }
+
+    return new Error(
+        AGENT_REGISTRATION_CONFLICT_ERROR
+    );
+
 }
 
 async function heartbeat(agentToken) {

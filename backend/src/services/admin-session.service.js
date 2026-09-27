@@ -77,18 +77,43 @@ async function validateAdminSession(
 
 }
 
+/**
+ * Cierra una sesion administrativa exigiendo la propiedad.
+ *
+ * Antes borraba solo por token, de modo que cualquier
+ * usuario autenticado que conociera el token de otro
+ * podia cerrarle la sesion. Ahora la coincidencia de
+ * user_id, server_id y token es requisito, y si no
+ * ocurre no se borra nada.
+ *
+ * No se envuelve en transaccion: es una sola sentencia.
+ * No se registra nada en auditoria, y en particular no se
+ * registra el token.
+ */
 async function deleteAdminSession(
+    userId,
+    serverId,
     token
 ) {
 
-    await pool.query(
-        `
-        DELETE
-        FROM admin_sessions
-        WHERE token = $1
-        `,
-        [token]
-    );
+    const result =
+        await pool.query(
+            `
+            DELETE
+            FROM admin_sessions
+            WHERE user_id = $1
+            AND server_id = $2
+            AND token = $3
+            RETURNING id
+            `,
+            [
+                userId,
+                serverId,
+                token
+            ]
+        );
+
+    return result.rowCount === 1;
 
 }
 

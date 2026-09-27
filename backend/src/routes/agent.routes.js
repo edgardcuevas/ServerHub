@@ -13,6 +13,15 @@ const {
     "../middlewares/agent-rate-limit.middleware"
 );
 
+const {
+    createRegisterRateLimit
+} = require(
+    "../middlewares/register-rate-limit.middleware"
+);
+
+const registerRateLimit =
+    createRegisterRateLimit();
+
 const heartbeatLimit =
     createAgentRateLimit(
         5000
@@ -79,8 +88,14 @@ const {
     getTokenInfo
 } = require("../controllers/agent.controller");
 
+/**
+ * El limitador va antes de la validacion para que los
+ * payloads invalidos tambien consuman intento, que es
+ * justamente el abuso que se quiere limitar.
+ */
 router.post(
     "/register",
+    registerRateLimit,
     validate(registerSchema),
     registerAgent
 );

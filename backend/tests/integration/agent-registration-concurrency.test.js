@@ -130,6 +130,13 @@ const UNIQUE_VIOLATION_MARKERS = [
     "violates unique constraint"
 ];
 
+/**
+ * Error de negocio que debe recibir el llamador cuando el
+ * servidor ya tiene un agente.
+ */
+const AGENT_CONFLICT_ERROR =
+    "Este servidor ya tiene un agente vinculado";
+
 const trackedUserIds = [];
 
 const trackedServerIds = [];
@@ -226,6 +233,16 @@ function classifyRejection(error) {
     ) {
 
         return "Clave utilizada (regla de negocio)";
+
+    }
+
+    if (
+        error &&
+        error.message ===
+        AGENT_CONFLICT_ERROR
+    ) {
+
+        return "23505 normalizado a error de negocio";
 
     }
 
@@ -890,12 +907,58 @@ test(
         );
 
         /**
+         * El controlador responde con error.message, asi
+         * que un 23505 crudo llegaria al cliente HTTP con
+         * el nombre de la restriccion. registerAgent lo
+         * traduce a un error de negocio.
+         */
+        assert.equal(
+            rejection.message,
+            AGENT_CONFLICT_ERROR,
+            "debe ser exactamente el error de negocio"
+        );
+
+        assert.equal(
+            rejection.message,
+            "Este servidor ya tiene un agente vinculado"
+        );
+
+        for (
+            const marker of
+            UNIQUE_VIOLATION_MARKERS
+        ) {
+
+            assert.ok(
+                !rejection.message
+                    .toLowerCase()
+                    .includes(
+                        marker
+                    ),
+                `el mensaje no debe revelar ` +
+                `"${marker}"`
+            );
+
+        }
+
+        assert.equal(
+            rejection.constraint,
+            undefined,
+            "no debe filtrar el nombre de la " +
+            "restriccion"
+        );
+
+        assert.equal(
+            rejection.code,
+            undefined,
+            "no debe filtrar el codigo SQLSTATE"
+        );
+
+        /**
          * El INSERT del agente choca con UNIQUE(server_id)
          * y el ROLLBACK deshace todo lo anterior a la
          * auditoria. La clave no debe consumirse, porque el
          * UPDATE condicional nunca llego a ejecutarse.
-         */
-        const keyState =
+         */        const keyState =
             await getKeyState(
                 key.id
             );

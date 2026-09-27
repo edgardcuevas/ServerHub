@@ -723,10 +723,16 @@ async function cleanupTestData(
             options.agentIds
         );
 
+    const sessionIds =
+        normalizeIdList(
+            options.sessionIds
+        );
+
     if (
         userIds.length === 0
         && serverIds.length === 0
         && agentIds.length === 0
+        && sessionIds.length === 0
     ) {
         return;
     }
@@ -746,6 +752,29 @@ async function cleanupTestData(
         await client.query(
             "BEGIN"
         );
+
+        /**
+         * admin_sessions tiene FK a servers y a users con
+         * ON DELETE CASCADE, asi que las sesiones tambien
+         * desaparecen al borrar el servidor o el usuario.
+         * Se borran de forma explicita y antes que ambos,
+         * para que la limpieza no dependa del cascada y
+         * siga siendo acotada a las sesiones creadas por la
+         * prueba.
+         */
+        if (
+            sessionIds.length > 0
+        ) {
+
+            await client.query(
+                `
+                DELETE FROM admin_sessions
+                WHERE id = ANY($1::int[])
+                `,
+                [sessionIds]
+            );
+
+        }
 
         /**
          * AGENT_TOKEN_REFRESHED se identifica por agentId
