@@ -1024,10 +1024,88 @@ async function closeTestPool() {
 
 }
 
+/**
+ * Clave de bloqueo consultivo que serializa las pruebas
+ * que ejecutan una limpieza GLOBAL de admin_sessions.
+ *
+ * cleanupExpiredAdminSessions borra por politica, sin
+ * filtro por usuario ni por servidor. Es lo correcto en
+ * produccion, pero significa que node --test, que ejecuta
+ * los archivos de integracion en paralelo y en procesos
+ * separados, puede tener dos limpiezas globales a la vez:
+ * la de un archivo borra las filas envejecidas que otro
+ * acaba de preparar, y los conteos dejan de ser atribuibles
+ * a un solo archivo.
+ *
+ * Un bloqueo consultivo de PostgreSQL serializa esas
+ * pruebas sin tocar codigo productivo. Se usa
+ * pg_advisory_lock, que es de sesion: se toma y se suelta
+ * en la MISMA conexion, y no bloquea a nadie que no la
+ * pida.
+ *
+ * La clave es un entero arbitrario y fijo. Lo unico que
+ * importa es que todos los archivos que ejecuten una
+ * limpieza global usen exactamente el mismo numero, y que
+ * ningun otro uso de la base lo reutilice.
+ */
+const GLOBAL_CLEANUP_LOCK_KEY =
+    918273645;
+
+/**
+ * Ejecuta una accion manteniendo el bloqueo de limpieza
+ * global.
+ *
+ * La accion recibe un client dedicado. Puede usarlo para
+ * sus propias consultas si lo necesita, y el bloqueo
+ * sigue sujeto a ese mismo client durante toda la accion.
+ *
+ * Si la accion lanza, el bloqueo se suelta igualmente en el
+ * finally y el error se propaga sin alterar. Un bloqueo
+ * retenido por una excepcion dejaria las pruebas siguientes
+ * esperando para siempre.
+ */
+async function withGlobalCleanupLock(
+    accion
+) {
+
+    const pool =
+        getTestPool();
+
+    await assertConnectedToTestDatabase(
+        pool
+    );
+
+    const client =
+        await pool.connect();
+
+    try {
+
+        await client.query(
+            "SELECT pg_advisory_lock($1)",
+            [GLOBAL_CLEANUP_LOCK_KEY]
+        );
+
+        return await accion(client);
+
+    } finally {
+
+        await client.query(
+            "SELECT pg_advisory_unlock($1)",
+            [GLOBAL_CLEANUP_LOCK_KEY]
+        ).catch(() => {});
+
+        client.release();
+
+    }
+
+}
+
 module.exports = {
     SAFE_ERROR_MESSAGE,
     ADMIN_SESSION_EVENTS,
     FORBIDDEN_AUDIT_KEYS,
+    GLOBAL_CLEANUP_LOCK_KEY,
+    withGlobalCleanupLock,
     getSafeConfigurationSummary,
     getExpectedDatabaseName,
     getTestPool,

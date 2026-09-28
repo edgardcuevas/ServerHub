@@ -13,6 +13,12 @@ const {
     "./jobs/agent-offline.job"
 );
 
+const {
+    startAdminSessionCleanupJob
+} = require(
+    "./jobs/admin-session-cleanup.job"
+);
+
 async function startServer() {
     try {
         // Verificar conexión con PostgreSQL
@@ -21,6 +27,7 @@ async function startServer() {
         console.log("✅ Base de datos conectada");
         startMetricsCleanupJob();
         startAgentOfflineJob();
+        startAdminSessionCleanupJob();
 
         // Iniciar servidor Express
         app.listen(PORT, () => {
